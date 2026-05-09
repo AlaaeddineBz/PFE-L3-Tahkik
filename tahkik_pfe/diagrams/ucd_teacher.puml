@@ -1,0 +1,24 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+actor Teacher
+
+rectangle "Teacher Panel" {
+  usecase "View Assigned Students" as UC1
+  usecase "Review Recitations" as UC2
+  usecase "Listen to Audio" as UC3
+  usecase "View AI Feedback" as UC4
+  usecase "Issue Ijaza Certificate" as UC5
+  usecase "Send Messages" as UC6
+  usecase "View Tajweed Results" as UC7
+}
+
+Teacher --> UC1
+Teacher --> UC2
+Teacher --> UC3
+Teacher --> UC5
+Teacher --> UC6
+
+UC2 ..> UC4 : <<include>>
+UC4 ..> UC7 : <<include>>
+@enduml

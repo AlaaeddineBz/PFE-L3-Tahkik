@@ -1,0 +1,27 @@
+@startuml
+!include <C4/C4_Container>
+
+Person(learner, "Learner", "Practices Quran recitation using the mobile app")
+Person(teacher, "Teacher", "Reviews recitations and manages students")
+Person(admin, "Admin", "Manages users and monitors platform health")
+
+System_Boundary(tahkik, "Tahkik Platform") {
+    Container(app, "Mobile App", "Flutter", "Provides UI for learners to read Quran and record recitations")
+    Container(dash, "Web Dashboard", "React", "Provides UI for teachers to review and admins to manage")
+    
+    ContainerDb(db, "Database & Auth", "Supabase (PostgreSQL)", "Stores user data, audio URLs, and handles authentication")
+    
+    Container(ai, "AI Server", "Python, FastAPI, Whisper", "Transcribes audio and returns Tajweed confidence scores")
+}
+
+Rel(learner, app, "Uses", "HTTPS")
+Rel(teacher, dash, "Uses", "HTTPS")
+Rel(admin, dash, "Uses", "HTTPS")
+
+Rel(app, db, "Reads/Writes data, Uploads audio", "HTTPS/WSS")
+Rel(dash, db, "Reads/Writes data", "HTTPS/WSS")
+
+Rel(app, ai, "Sends audio for processing", "WebSocket/HTTPS")
+Rel(ai, db, "Stores processing results", "HTTPS")
+
+@enduml

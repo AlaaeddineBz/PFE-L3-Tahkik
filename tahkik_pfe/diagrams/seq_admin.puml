@@ -1,0 +1,18 @@
+@startuml
+actor Admin as A
+participant "Tahkik Dashboard" as Dash
+database "Supabase DB" as DB
+
+A -> Dash : Open User Management
+Dash -> DB : Fetch Users List
+DB --> Dash : Return Users
+A -> Dash : Search or Filter Users
+Dash -> Dash : Filter List
+A -> Dash : View User Details
+Dash -> DB : Fetch User Profile & Stats
+DB --> Dash : Return Details
+A -> Dash : Suspend / Activate User Account
+Dash -> DB : Update User Status
+DB --> Dash : Confirmation
+Dash --> A : Show Success Message
+@enduml

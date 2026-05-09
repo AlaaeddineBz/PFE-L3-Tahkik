@@ -1,0 +1,32 @@
+\documentclass[12pt,a4paper]{report}
+
+\input{preamble}
+
+\begin{document}
+
+% ─── COVER PAGE ──────────────────────────────────────────────────────────────
+\input{front/cover}
+
+% ─── FRONT MATTER ────────────────────────────────────────────────────────────
+\pagenumbering{roman}
+\input{front/dedication}
+\input{front/acknowledgements}
+\input{front/abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+% ─── MAIN MATTER ─────────────────────────────────────────────────────────────
+\newpage
+\pagenumbering{arabic}
+\input{chapters/general_introduction}
+\input{chapters/chapter1_state_of_art}
+\input{chapters/chapter2_conceptual_study}
+\input{chapters/chapter3_implementation}
+\input{chapters/general_conclusion}
+
+% ─── BACK MATTER ─────────────────────────────────────────────────────────────
+\input{back/bibliography}
+
+\end{document}

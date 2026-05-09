@@ -1,0 +1,11 @@
+@startuml
+actor Learner as L
+participant "Tahkik App" as App
+database "Supabase DB" as DB
+
+L -> App : Navigate to Progress Tab
+App -> DB : Fetch Recitation History & Scores
+DB --> App : Return Raw Data
+App -> App : Calculate Analytics (Average Score, Total Recitations, Streaks)
+App --> L : Display Progress Dashboard & Charts
+@enduml

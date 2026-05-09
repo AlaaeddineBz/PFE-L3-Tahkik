@@ -1,0 +1,23 @@
+@startuml
+actor Learner as L
+participant "Tahkik App" as App
+participant "Supabase Auth" as Auth
+database "Supabase DB" as DB
+
+L -> App : Open App
+App -> L : Display Registration Form
+L -> App : Fill Name, Email, Password
+L -> App : Submit Form
+App -> Auth : Register(Email, Password)
+Auth -> DB : Check if Email exists
+alt Email exists
+  DB --> Auth : Conflict
+  Auth --> App : Registration Error
+  App --> L : Show Error Message
+else New Email
+  DB --> Auth : Success
+  Auth -> DB : Create User Profile (Name, Email)
+  Auth --> App : Return Session & JWT
+  App --> L : Redirect to Onboarding / Home
+end
+@enduml
