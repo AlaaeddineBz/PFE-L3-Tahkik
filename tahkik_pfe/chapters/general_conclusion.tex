@@ -1,0 +1,49 @@
+\chapter*{General Conclusion}
+\addcontentsline{toc}{chapter}{General Conclusion}
+\label{ch:general_conclusion}
+
+The primary objective of this Final Year Project was to design, develop, and deploy a comprehensive digital platform dedicated to the learning and perfection of Quranic recitation and Tajweed rules. Through the development of \textbf{Tahkik}, we have demonstrated how modern technology --- specifically Artificial Intelligence, cross-platform mobile development, and cloud-based backend services --- can be leveraged to address the traditional challenges of accessibility and personalized feedback in Islamic education.
+
+In Chapter~\ref{ch:state_of_art}, we presented the domain of Quranic recitation and Tajweed, analyzed existing digital solutions including Quran.com, Tarteel AI, and online tutoring platforms, and identified a critical gap: the absence of a platform combining instant AI feedback with structured human teacher review.
+
+In Chapter~\ref{ch:conceptual}, we modeled the system using UML to ensure a clear separation of concerns among the different actors (Learners, Teachers, Administrators), defined 10 functional and 5 non-functional requirements, and designed the system architecture with detailed use case, sequence, and class diagrams.
+
+In Chapter~\ref{ch:implementation}, we successfully implemented the platform using Flutter for the mobile app, React for the web dashboard, Supabase for the backend, and Python with the Whisper model for AI-powered recitation analysis.
+
+\begin{emeraldbox}[title=Key Contributions]
+\begin{enumerate}
+  \item A cross-platform mobile application providing an intuitive Quran reading and recitation recording experience.
+  \item Integration of the Whisper AI model for real-time pronunciation analysis and Tajweed error detection.
+  \item A dedicated web dashboard empowering teachers to review, correct, and manage student recitations.
+  \item A comprehensive administration panel with analytics, user management, and AI health monitoring.
+  \item A human-in-the-loop architecture combining AI efficiency with teacher expertise.
+\end{enumerate}
+\end{emeraldbox}
+
+Despite these achievements, certain limitations remain:
+\begin{itemize}
+  \item The AI model's accuracy varies across different recitation styles (Qira'at) and regional accents.
+  \item The current implementation requires an internet connection for AI processing.
+  \item The gamification features and social interaction elements are limited in this version.
+\end{itemize}
+
+\begin{goldbox}[title=Future Perspectives]
+\begin{itemize}
+  \item Fine-tuning the Whisper model specifically on diverse Qira'at (Warsh, Hafs, etc.) for improved accuracy.
+  \item Adding offline AI inference capabilities using on-device models.
+  \item Implementing gamification features (badges, leaderboards, learning paths) to increase engagement.
+  \item Integrating live tutoring sessions with built-in video/audio calls between teachers and students.
+  \item Developing community features for learners to share achievements and support each other.
+\end{itemize}
+\end{goldbox}
+
+\begin{emeraldbox}[title=Closing Statement]
+\begin{center}
+\large\itshape
+``Read! In the name of your Lord who created.''\\[6pt]
+\normalsize\normalfont\color{black} --- Surah Al-Alaq, Verse 1
+\end{center}
+\vspace{6pt}
+\normalsize
+The Tahkik platform represents a meaningful step forward in digital Islamic education. By harmonizing the efficiency of AI with the irreplaceable expertise of human teachers, Tahkik aspires to make high-quality Tajweed instruction accessible to a global audience, preserving the oral tradition of the Quran for generations to come.
+\end{emeraldbox}

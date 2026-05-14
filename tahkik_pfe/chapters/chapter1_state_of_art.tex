@@ -1,0 +1,144 @@
+\chapter{State of the Art}
+\label{ch:state_of_art}
+
+\section{Introduction}
+
+In order to provide an effective and relevant solution, it is essential to study and analyze the existing facts, practices, and technologies related to Quranic recitation learning and digital platforms. This analysis helps identify key elements and existing trends that will inform and guide the development of our proposed solution.
+
+This chapter presents an overview of the current context surrounding Quranic e-learning. It begins with a general definition of Tajweed and its importance, followed by a review of existing digital solutions. It concludes with a comparative analysis that highlights the gap our project aims to fill.
+
+\section{Domain Overview}
+\label{sec:soa_domain}
+
+\subsection{Definition and Context}
+
+\begin{emeraldbox}[title=Tajweed]
+Tajweed literally means ``to make well'' or ``to improve.'' In the context of Quranic recitation, it refers to the set of linguistic and phonetic rules applied when reading the Quran. These rules govern the correct pronunciation of each letter from its proper articulation point (\textit{Makhraj}) with its associated attributes (\textit{Sifat}). Proper application of Tajweed is considered obligatory (\textit{Fard}) upon every Muslim who recites the Quran, as incorrect pronunciation can alter the meaning of the sacred text.
+\end{emeraldbox}
+
+\subsection{Traditional Learning Methods}
+Traditionally, Tajweed is learned through direct interaction with a qualified teacher (\textit{Sheikh}). This process involves two key methods:
+\begin{itemize}
+  \item \textbf{Talaqqi (Receiving)}: The student listens to the teacher recite, absorbing the correct pronunciation and rhythm.
+  \item \textbf{Mushafahah (Lip-to-lip)}: The student recites back to the teacher, who observes the mouth movements and corrects pronunciation in real-time.
+\end{itemize}
+
+While highly effective, this traditional method faces several modern challenges:
+\begin{itemize}
+  \item \textbf{Accessibility}: A critical shortage of qualified teachers, especially in non-Arabic speaking regions and remote areas.
+  \item \textbf{Time Constraints}: Scheduling regular sessions with a teacher is difficult for individuals with busy lifestyles.
+  \item \textbf{Scalability}: A single teacher can only attend to a limited number of students effectively at any given time.
+  \item \textbf{Cost}: Private tutoring can be expensive and unaffordable for many learners.
+\end{itemize}
+
+\subsection{Key Concepts}
+
+\begin{emeraldbox}[title=Automatic Speech Recognition (ASR)]
+Automatic Speech Recognition is the computational task of converting spoken language into written text. Modern ASR systems use deep learning models trained on large datasets of audio-text pairs to achieve high accuracy across multiple languages and dialects.
+\end{emeraldbox}
+
+\begin{emeraldbox}[title=Whisper Model]
+Whisper is a general-purpose speech recognition model developed by OpenAI. Trained on 680,000 hours of multilingual data, it demonstrates strong performance in transcription, translation, and language identification. Its support for Arabic makes it a promising candidate for Quranic recitation analysis.
+\end{emeraldbox}
+
+\section{Existing Solutions}
+\label{sec:soa_existing}
+
+With the advent of smartphones and the internet, numerous applications have been developed to facilitate Quran reading and memorization. We analyze the most relevant existing solutions below.
+
+\subsection{Quran.com / Ayat}
+
+\begin{infobox}[title=Key Features of Quran.com]
+\begin{itemize}
+  \item Digital Mushaf with multiple translations
+  \item Professional audio recitations by renowned Qaris
+  \item Verse-by-verse audio playback and bookmarking
+  \item Word-by-word translation and transliteration
+\end{itemize}
+\end{infobox}
+
+\textbf{Strengths}: Excellent for reading, listening, and following along. High accessibility and offline support.\\
+\textbf{Weaknesses}: Completely passive --- no interactive feedback. Users can listen to correct pronunciation but receive no evaluation of their own recitation.
+
+\subsection{Tarteel AI}
+
+\begin{infobox}[title=Key Features of Tarteel AI]
+\begin{itemize}
+  \item AI-powered recitation tracking (follows along as user recites)
+  \item Mistake detection during memorization (Hifz)
+  \item Gamification elements (streaks, challenges)
+  \item Voice search for Quranic verses
+\end{itemize}
+\end{infobox}
+
+\textbf{Strengths}: Real-time AI tracking, gamification to increase engagement, modern user interface.\\
+\textbf{Weaknesses}: Focuses primarily on memorization (whether the user said the \textit{right word}) rather than on precise phonetic Tajweed rules (how the user \textit{pronounced} the word). No structured teacher involvement or human review system.
+
+\subsection{Live Tutoring Platforms (Online Academies)}
+
+\begin{infobox}[title=Key Features of Online Tutoring]
+\begin{itemize}
+  \item One-on-one sessions with qualified teachers via video conferencing
+  \item Personalized curriculum and feedback
+  \item Scheduling flexibility
+\end{itemize}
+\end{infobox}
+
+\textbf{Strengths}: Provides personalized, expert-level feedback from human teachers.\\
+\textbf{Weaknesses}: High cost per session, scheduling dependencies, limited availability of highly qualified teachers, and no AI-assisted pre-screening of recitations.
+
+\section{Comparative Analysis}
+\label{sec:soa_comparison}
+
+\begin{table}[H]
+  \centering
+  \caption{Comparison of existing solutions}
+  \label{tab:soa_comparison}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{l*{4}{c}}
+    \toprule
+    \textbf{Criteria} & \textbf{Quran.com} & \textbf{Tarteel AI} & \textbf{Online Tutoring} & \textbf{Tahkik} \\
+    \midrule
+    Free Access           & \checkmark & $\times$ & $\times$ & \checkmark \\
+    AI Recitation Feedback & $\times$ & \checkmark & $\times$ & \checkmark \\
+    Tajweed Rule Detection & $\times$ & $\times$ & \checkmark & \checkmark \\
+    Teacher Dashboard      & $\times$ & $\times$ & $\times$ & \checkmark \\
+    Progress Tracking      & $\times$ & \checkmark & \checkmark & \checkmark \\
+    Human Review System    & $\times$ & $\times$ & \checkmark & \checkmark \\
+    Mobile App             & \checkmark & \checkmark & $\times$ & \checkmark \\
+    Cross-Platform         & \checkmark & \checkmark & $\times$ & \checkmark \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Problem Statement}
+\label{sec:soa_problem}
+
+The analysis of existing solutions reveals a clear gap in the market: there is no platform that effectively combines the \textbf{scalability and instant feedback of AI} with the \textbf{nuanced, authoritative guidance of human teachers} in a single, accessible ecosystem.
+
+\begin{warnbox}[title=Identified Limitations]
+\begin{itemize}
+  \item Existing AI tools focus on word-level tracking, not phonetic Tajweed rule application.
+  \item No platform provides a dedicated teacher dashboard for reviewing AI-flagged recitations.
+  \item There is no unified system combining AI feedback with structured human review.
+  \item Most solutions lack comprehensive progress tracking and structured learning paths.
+\end{itemize}
+\end{warnbox}
+
+\section{Proposed Solution}
+\label{sec:soa_solution}
+
+To address these limitations, we propose \textbf{Tahkik} --- an AI-powered platform for Quran recitation and Tajweed learning.
+
+\begin{emeraldbox}[title=Project Objectives]
+\begin{enumerate}
+  \item Provide instant AI-driven pronunciation feedback using the Whisper model
+  \item Offer a dedicated teacher dashboard for expert recitation review (human-in-the-loop)
+  \item Create a structured learning ecosystem with progress tracking and practice sessions
+  \item Support cross-platform access through a Flutter mobile app and React web dashboard
+\end{enumerate}
+\end{emeraldbox}
+
+\section{Conclusion}
+
+In this chapter, we presented the domain of Quranic recitation and Tajweed, reviewed three categories of existing digital solutions, and identified their key limitations. These findings motivate the design of our solution, Tahkik, which will be detailed in the conceptual study presented in Chapter~\ref{ch:conceptual}.

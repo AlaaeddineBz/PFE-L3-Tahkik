@@ -1,0 +1,20 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+actor Learner
+
+rectangle "Progress & Subscription" {
+  usecase "View Progress Dashboard" as UC1
+  usecase "View Recitation History" as UC2
+  usecase "View Statistics Charts" as UC3
+  usecase "Manage Subscription" as UC4
+  usecase "Upgrade Plan" as UC5
+}
+
+Learner --> UC1
+Learner --> UC2
+Learner --> UC3
+Learner --> UC4
+
+UC4 <.. UC5 : <<extend>>
+@enduml

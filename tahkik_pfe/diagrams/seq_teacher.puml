@@ -1,0 +1,21 @@
+@startuml
+actor Teacher as T
+participant "Tahkik Dashboard" as Dash
+database "Supabase DB" as DB
+participant "Tahkik App" as App
+actor Learner as L
+
+T -> Dash : Open Pending Recitations
+Dash -> DB : Fetch Recitations (Status: Pending)
+DB --> Dash : Return List
+T -> Dash : Select Recitation to Review
+Dash -> DB : Fetch Audio URL & AI Flags
+DB --> Dash : Return Audio & AI Feedback
+T -> Dash : Listen to Audio
+T -> Dash : Review AI Flags
+T -> Dash : Submit Manual Feedback (Notes)
+Dash -> DB : Save Feedback
+DB --> Dash : Confirmation
+DB -> App : Real-time Notification
+App --> L : "New Teacher Feedback"
+@enduml

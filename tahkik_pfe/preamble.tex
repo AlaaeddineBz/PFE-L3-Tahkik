@@ -1,0 +1,158 @@
+% ─── PACKAGES ───────────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{mdframed}
+\usepackage{amsmath}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{float}
+\usepackage{makecell}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{amssymb}
+
+% ─── PAGE GEOMETRY ──────────────────────────────────────────────────────────
+\geometry{
+    a4paper,
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm,
+    headheight=15pt
+}
+
+% ─── COLOURS ────────────────────────────────────────────────────────────────
+\definecolor{darkblue}{HTML}{002366} % Professional Navy Blue
+\definecolor{darkbg}{HTML}{0f172a}
+\definecolor{emerald}{HTML}{10b981}
+\definecolor{teal}{HTML}{0d9488}
+\definecolor{gold}{HTML}{d4af37}
+\definecolor{goldlt}{HTML}{b8920a}
+\definecolor{slategray}{HTML}{64748b}
+\definecolor{lightblue}{HTML}{2563eb}
+\definecolor{warshgreen}{HTML}{059669}
+\definecolor{warnred}{HTML}{ea580c}
+\definecolor{violet}{HTML}{7c3aed}
+\definecolor{cardbg}{HTML}{f0f9ff}
+\definecolor{tealbg}{HTML}{f0fdfa}
+\definecolor{goldbg}{HTML}{fffbeb}
+\definecolor{redbg}{HTML}{fff7ed}
+
+% ─── HYPERREF ───────────────────────────────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    citecolor=black,
+    pdftitle={Tahkik: AI-Powered Quran Recitation Platform},
+    pdfauthor={PFE Team}
+}
+
+% ─── SECTION TITLE STYLES ───────────────────────────────────────────────────
+\titleformat{\chapter}[block]
+  {\normalfont\LARGE\bfseries\color{darkblue}}
+  {\thechapter.}{12pt}{}
+  [\vspace{2pt}\color{darkblue}\rule{\textwidth}{1.5pt}]
+
+\titleformat{\section}
+  {\normalfont\large\bfseries\color{darkblue}}
+  {\thesection}{10pt}{}
+
+\titleformat{\subsection}
+  {\normalfont\normalsize\bfseries\color{darkblue}}
+  {\thesubsection}{8pt}{}
+
+\titlespacing*{\chapter}{0pt}{0pt}{20pt}
+
+% ─── HEADER / FOOTER ────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{black}\textit{Tahkik --- AI-Powered Quran Recitation}}
+\fancyhead[R]{\small\color{black}L3 Computer Science --- 2025/2026}
+\fancyfoot[C]{\small\color{black}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{black}\leaders\hrule height \headrulewidth\hfill}}
+
+% ─── TCOLORBOX STYLES ───────────────────────────────────────────────────────
+\newtcolorbox{emeraldbox}[1][]{
+  enhanced, colback=white, colframe=black,
+  fonttitle=\bfseries\color{white}, colbacktitle=black,
+  attach boxed title to top left={yshift=-2mm,xshift=6mm},
+  boxed title style={sharp corners}, sharp corners, breakable, #1
+}
+
+\newtcolorbox{goldbox}[1][]{
+  enhanced, colback=white, colframe=black,
+  fonttitle=\bfseries\color{white}, colbacktitle=black,
+  attach boxed title to top left={yshift=-2mm,xshift=6mm},
+  boxed title style={sharp corners}, sharp corners, breakable, #1
+}
+
+\newtcolorbox{warnbox}[1][]{
+  enhanced, colback=white, colframe=black,
+  fonttitle=\bfseries\color{white}, colbacktitle=black,
+  attach boxed title to top left={yshift=-2mm,xshift=6mm},
+  boxed title style={sharp corners}, sharp corners, breakable, #1
+}
+
+\newtcolorbox{infobox}[1][]{
+  enhanced, colback=white, colframe=black,
+  fonttitle=\bfseries\color{white}, colbacktitle=black,
+  attach boxed title to top left={yshift=-2mm,xshift=6mm},
+  boxed title style={sharp corners}, sharp corners, breakable, #1
+}
+
+% ─── CUSTOM PHASE BLOCK ────────────────────────────────────────────────────
+\newcommand{\phaseblock}[3]{%
+  \begin{tcolorbox}[
+    enhanced, colback=white, colframe=black,
+    leftrule=5pt, sharp corners, before upper={\parindent0pt}
+  ]
+  {\bfseries\color{black}Phase #1 --- #2}\\[4pt]
+  \small #3
+  \end{tcolorbox}%
+}
+
+% ─── SCREENSHOT PLACEHOLDER ────────────────────────────────────────────────
+\newcommand{\screenshotplaceholder}[2]{%
+  \begin{figure}[H]
+    \centering
+    \fbox{\parbox{#1\textwidth}{\centering\vspace{3cm}
+      \textit{Screenshot: #2}\vspace{3cm}}}
+  \end{figure}%
+}
+
+% ─── LOGO PLACEHOLDER ──────────────────────────────────────────────────────
+\newcommand{\logoplaceholder}[1]{%
+  \fbox{\parbox{1.5cm}{\centering\vspace{0.5cm}
+    \scriptsize\textit{Logo: #1}\vspace{0.5cm}}}%
+}
+
+% ─── CODE LISTING STYLE ────────────────────────────────────────────────────
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{white},
+  frame=single,
+  rulecolor=\color{black},
+  breaklines=true,
+  numbers=left,
+  numberstyle=\tiny\color{black},
+  tabsize=2
+}
+
+% ─── LINE SPACING ──────────────────────────────────────────────────────────
+\onehalfspacing

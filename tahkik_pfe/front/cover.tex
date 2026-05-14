@@ -1,0 +1,63 @@
+% ─── COVER PAGE ──────────────────────────────────────────────────────────────
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  % Gold accent line at top
+  \fill[gold] (current page.north west) rectangle ([yshift=-4pt]current page.north east);
+  % Teal accent line at bottom
+  \fill[teal] (current page.south west) rectangle ([yshift=4pt]current page.south east);
+\end{tikzpicture}
+
+\begin{center}
+\vspace*{0.5cm}
+
+% ── University Info ──
+{\large\color{darkbg}\textbf{The People's Democratic Republic of Algeria}}\\[4pt]
+{\normalsize\color{slategray}Ministry of Higher Education and Scientific Research}\\[12pt]
+{\large\color{teal}\textbf{Yahia Fares University of Medea}}\\[4pt]
+{\normalsize\color{slategray}Faculty of Sciences}\\[2pt]
+{\normalsize\color{slategray}Department of Mathematics and Computer Science}\\[2pt]
+{\small\color{slategray}Specialty: Computer Science}
+
+\vspace{1cm}
+
+% ── Badge ──
+\begin{tikzpicture}
+\node[draw=gold, rounded corners=8pt, inner sep=8pt, fill=goldbg, text=darkbg, font=\small\bfseries] {
+  AI \,$\cdot$\, Deep Learning \,$\cdot$\, Quran Recitation \,$\cdot$\, Tajweed \,$\cdot$\, Flutter \,$\cdot$\, React
+};
+\end{tikzpicture}
+
+\vspace{1cm}
+
+% ── Title ──
+{\color{darkbg}\rule{0.8\textwidth}{0.5pt}}\\[12pt]
+{\Huge\bfseries\color{darkbg} Tahkik}\\[8pt]
+{\Large\color{teal}\textbf{AI-Powered Quran Recitation and Tajweed Learning Platform}}\\[6pt]
+{\normalsize\color{slategray}\textit{Mobile Application \& Web Administration Dashboard}}\\[12pt]
+{\color{darkbg}\rule{0.8\textwidth}{0.5pt}}
+
+\vspace{1.5cm}
+
+% ── Authors & Supervisor ──
+\begin{tabular}{ll}
+  \textbf{\color{teal}Supervisor:} & Mme. \textit{Meriem Ali Khoudja} \\[12pt]
+  \textbf{\color{teal}By:} & \textit{Benhadjer Mohamed} \\
+  & \textit{Bouziani Alaa Eddine} \\
+\end{tabular}
+
+\vfill
+
+% ── PFE badge ──
+\begin{tikzpicture}
+\node[draw=teal, rounded corners=6pt, inner sep=6pt, fill=tealbg, text=teal!80!black, font=\small\bfseries] {
+  Final Year Project (PFE) --- L3 Computer Science
+};
+\end{tikzpicture}
+
+\vspace{0.5cm}
+
+{\large\color{gold}\textbf{Promotion: 2025 / 2026}}\\[4pt]
+{\small\color{slategray}Medea, Algeria}
+
+\end{center}
+\newpage
