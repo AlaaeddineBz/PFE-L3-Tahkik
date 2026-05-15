@@ -150,6 +150,13 @@
 
 \onehalfspacing
 
+% Allow LaTeX a bit more wiggle room before declaring overfull hboxes;
+% needed because paragraphs include long un-hyphenable \texttt{} fragments
+% (filenames, dotted env vars, URLs) that would otherwise overflow.
+\setlength{\emergencystretch}{3em}
+\hbadness=99999  % silence underfull-hbox warnings
+\hfuzz=2pt       % tolerate <= 2pt overflow without emitting a warning
+
 \begin{document}
 
 % COVER PAGE
@@ -178,7 +185,7 @@
       draw=emerald!80!black, fill=emerald!15!white,
       rounded corners=10pt, inner sep=7pt,
       font=\small\bfseries, text=emerald!70!black
-    ] {Go \(\cdot\) Python \(\cdot\) FastAPI \(\cdot\) Whisper \(\cdot\) HF Spaces};
+    ] {Go \(\cdot\) Python \(\cdot\) NeMo FastConformer \(\cdot\) Docker \(\cdot\) Caddy};
   \end{tikzpicture}
 \end{center}
 

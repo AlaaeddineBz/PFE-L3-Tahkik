@@ -1,0 +1,473 @@
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 6: SETUP AND DEPLOYMENT
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Setup and Deployment}
+
+\section{Production: One-Shot Droplet Provisioning}
+
+Production runs on a single DigitalOcean droplet provisioned by the helper script \texttt{scripts/}\linebreak[1]\texttt{provision-droplet.sh}. From a fresh Ubuntu 22.04 root shell:
+
+\begin{infobox}[title=Provisioning Command]
+\begin{verbatim}
+DROPLET_IP="<DROPLET_IP>"
+SITE_HOST="${DROPLET_IP//./-}.nip.io"
+
+ssh -i ~/.ssh/tahkik_do root@$DROPLET_IP \
+  "curl -fsSL https://raw.githubusercontent.com/\
+mohamedbenhadjer/tahkik-server/main/scripts/provision-droplet.sh \
+  | SITE_HOST=$SITE_HOST bash"
+\end{verbatim}
+\end{infobox}
+
+The script is idempotent and does:
+
+\begin{enumerate}
+  \item Create a 4\,GB swapfile and tune \texttt{vm.swappiness=10}.
+  \item Install Docker Engine + Compose plugin (with JSON log rotation).
+  \item Detect a GPU (via \texttt{lspci}) and install the NVIDIA Container Toolkit if present.
+  \item Clone the repository to \texttt{/opt/tahkik-server}.
+  \item Write \texttt{.env} with \texttt{SITE\_HOST}, \texttt{MODEL\_ID}, \texttt{NEMO\_DEVICE}, \texttt{HEALTH\_TOKEN} (auto-generated if not supplied), and optional \texttt{HF\_TOKEN}.
+  \item Build all three containers and bring the stack up. On a GPU droplet the \texttt{docker-compose.gpu.yml} overlay is applied automatically.
+\end{enumerate}
+
+First boot takes 10--15 minutes: \texttt{nemo\_toolkit[asr]} pulls roughly 1.5\,GB of wheels and the model checkpoint is around 500\,MB.
+
+\section{Continuous Deployment}
+
+The repository's \texttt{.github/workflows/deploy.yml} watches \texttt{main} and triggers a redeploy via SSH using the \texttt{appleboy/ssh-action} runner. On the droplet it runs:
+
+\begin{lstlisting}[caption={GitHub Actions redeploy script}]
+cd /opt/tahkik-server
+git fetch origin main
+git reset --hard origin/main
+export GIT_SHA=$(git rev-parse --short HEAD)
+export DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+docker compose pull caddy || true
+if lspci | grep -i nvidia >/dev/null 2>&1; then
+  docker compose -f docker-compose.yml -f docker-compose.gpu.yml \
+                 up -d --build
+else
+  docker compose up -d --build
+fi
+docker image prune -f
+\end{lstlisting}
+
+\texttt{GIT\_SHA} and \texttt{DEPLOYED\_AT} are baked into the Go binary via \texttt{-ldflags} so the \texttt{/api/v1/system-health} response advertises the running build.
+
+\section{Local Development}
+
+For local iteration the Go and Python servers can run without Docker:
+
+\phaseblocks{Step 1 --- Python Environment}{%
+\texttt{cd python}\\
+\texttt{python3 -m venv .venv \&\& source .venv/bin/activate}\\
+\texttt{pip install -r requirements.txt}
+}
+
+\phaseblocks{Step 2 --- Start Inference Server}{%
+\texttt{python inference\_server.py --port 8081}\\
+Wait for the \texttt{[inference] READY} line on stdout.
+}
+
+\phaseblocks{Step 3 --- Start Go Server}{%
+\texttt{export INFERENCE\_SERVER\_URL=http://localhost:8081}\\
+\texttt{export PORT=8080}\\
+\texttt{go run ./cmd/api}
+}
+
+The local Python entry point (\texttt{python/inference\_server.py}) is the legacy Whisper development server using \texttt{benhadjermed/tahkik-small-warsh}. The production stack always uses the NeMo container at \texttt{python/hf\_space/}.
+
+\section{Environment Variables}
+
+\begin{table}[H]
+  \centering
+  \caption{Configuration environment variables}
+  \label{tab:env_vars}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{llp{5.5cm}}
+    \toprule
+    \textbf{Variable} & \textbf{Default} & \textbf{Purpose} \\
+    \midrule
+    \texttt{SITE\_HOST}             & ---                                 & Public hostname Caddy issues a TLS cert for \\
+    \texttt{DASHBOARD\_ORIGIN}      & \texttt{http://localhost:5173}      & CORS origin allowed by Caddy \\
+    \texttt{MODEL\_ID}              & \texttt{nvidia/stt\_ar\_fc\dots}    & NeMo model identifier \\
+    \texttt{NEMO\_DEVICE}           & \texttt{cpu}                        & \texttt{cpu} or \texttt{cuda} \\
+    \texttt{TORCH\_NUM\_THREADS}    & \texttt{4}                          & CPU thread cap (irrelevant on GPU) \\
+    \texttt{INFERENCE\_SERVER\_URL} & \texttt{http://localhost:8081}      & Backend URL seen by the Go server \\
+    \texttt{HF\_TOKEN}              & ---                                 & Bearer token for HF access (private repos) \\
+    \texttt{HEALTH\_TOKEN}          & ---                                 & Bearer token for \texttt{/api/v1/system-health} \\
+    \texttt{PORT}                   & \texttt{8080}                       & Go server listen port \\
+    \texttt{COMPOSE\_PROJECT\_NAME} & \texttt{tahkik-server}              & Compose label used by container enumeration \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Hardware Recommendations}
+
+\begin{table}[H]
+  \centering
+  \caption{Tested hardware tiers}
+  \label{tab:hardware}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{llcc}
+    \toprule
+    \textbf{Tier} & \textbf{Hardware} & \textbf{Cold Start} & \textbf{Partial / Final p50} \\
+    \midrule
+    Development    & CPU laptop              & ${\sim}30$\,s & ${\sim}5$ / ${\sim}10$\,s \\
+    Production CPU & DO \texttt{s-4vcpu-8gb} & ${\sim}60$\,s & 3--8 / 8--15\,s \\
+    Production GPU & NVIDIA T4 / L4          & ${\sim}40$\,s & ${<}1$ / 1--2\,s \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 7: API REFERENCE
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{API Reference}
+
+\section{Go Server Endpoints (Client-Facing)}
+
+\subsection{POST /api/v1/evaluate}
+
+Upload an audio file for Arabic Quranic recitation transcription, optionally with a reference text to enable madd analysis.
+
+\begin{infobox}[title=Request Format]
+Content-Type: \texttt{multipart/form-data}\\[2pt]
+Required field: \texttt{audio} (file --- \texttt{.wav}, \texttt{.mp3}, \texttt{.m4a}, \texttt{.flac}, \texttt{.ogg}; max 50\,MB)\\[2pt]
+Optional field: \texttt{reference\_text} (string --- bare text \emph{or} JSON-encoded array \texttt{[\{"surah":1,"ayah":1,"text":"\dots"\}, \dots]})
+\end{infobox}
+
+\begin{emeraldbox}[title=Success Response (200 OK) --- without reference\_text]
+\begin{verbatim}
+{
+  "status": "success",
+  "data": {
+    "transcription": "<Arabic transcription text>",
+    "confidence_score": 0.9423,
+    "processing_time_ms": 1350
+  }
+}
+\end{verbatim}
+\end{emeraldbox}
+
+\begin{emeraldbox}[title=Success Response (200 OK) --- with reference\_text]
+\begin{verbatim}
+{
+  "status": "success",
+  "data": {
+    "transcription": "...",
+    "confidence_score": 0.93,
+    "processing_time_ms": 2100,
+    "haraka_ms": 280,
+    "errors": [
+      {
+        "word": "...",
+        "word_index": 3,
+        "rule": "Al-Madd",
+        "sub_rule": "...",
+        "severity": "minor",
+        "expected": "2 counts",
+        "detected": "~1.4 counts",
+        "explanation": "Natural elongation of 2 counts...",
+        "timestamp": {"start": 1.872, "end": 2.144}
+      }
+    ]
+  }
+}
+\end{verbatim}
+\end{emeraldbox}
+
+\begin{warnbox}[title=Error Response (4xx / 5xx)]
+\begin{verbatim}
+{ "status": "error", "message": "unsupported audio format: .xyz" }
+\end{verbatim}
+\end{warnbox}
+
+\subsection{GET /api/v1/system-health (Bearer-token gated)}
+
+Returns the aggregated host + container + inference snapshot described in Section~\ref{subsec:system_health}.
+
+\begin{emeraldbox}[title=Response (200 OK) --- shape only]
+\begin{verbatim}
+{
+  "status": "ok",                       // ok | loading | degraded
+  "host": {
+    "hostname": "tahkik-nemo",
+    "uptime_seconds": 81234,
+    "cpu_percent": 14.2,
+    "mem_used_mb": 3210,  "mem_total_mb": 7890,
+    "swap_used_mb": 0,    "swap_total_mb": 4096,
+    "disk_used_gb": 27,   "disk_total_gb": 160,
+    "load_1m": 0.71, "load_5m": 0.65
+  },
+  "containers": [
+    { "name": "caddy",     "status": "running",  "up_since": "..." },
+    { "name": "go-server", "status": "healthy",  "up_since": "..." },
+    { "name": "python",    "status": "healthy",  "up_since": "..." }
+  ],
+  "inference": { "requests_total": ..., "partial_p95_ms": ..., ... },
+  "model":     { "id": "...", "device": "cpu", "loaded": true, ... },
+  "version":   { "git_sha": "abc1234", "deployed_at": "2026-..." }
+}
+\end{verbatim}
+\end{emeraldbox}
+
+\subsection{GET /api/v1/system-health/ws (WebSocket)}
+
+WebSocket upgrade of the above endpoint. Authentication is via \texttt{?token=<HEALTH\_TOKEN>} on the URL because browsers cannot set custom headers on a WebSocket handshake. The server pushes a fresh snapshot every 2 seconds and responds to client close frames cleanly.
+
+\subsection{GET /health}
+
+\begin{emeraldbox}[title=Health Check Response (200 OK)]
+\begin{verbatim}
+{"status": "ok"}
+\end{verbatim}
+\end{emeraldbox}
+
+\section{Response Fields}
+
+\begin{table}[H]
+  \centering
+  \caption{\texttt{data} object fields on \texttt{/api/v1/evaluate}}
+  \label{tab:api_fields}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{llp{6.8cm}}
+    \toprule
+    \textbf{Field} & \textbf{Type} & \textbf{Description} \\
+    \midrule
+    \texttt{transcription}      & string & Arabic transcription of the recitation \\
+    \texttt{confidence\_score}  & float  & Mapped RNNT log-prob score in $[0, 1]$ \\
+    \texttt{processing\_time\_ms} & int  & Time in model (ms), excluding network \\
+    \texttt{haraka\_ms}         & int    & Auto-calibrated one-haraka length (only when \texttt{reference\_text} was sent) \\
+    \texttt{errors}             & list   & Detected \texttt{TajweedError} objects (only when \texttt{reference\_text} was sent) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Flutter Integration Example}
+
+\begin{lstlisting}[language=Java, caption={Dart/Flutter API call example}]
+final dio = Dio(BaseOptions(baseUrl: 'https://<site-host>'));
+
+Future<Map<String, dynamic>> evaluate(File audioFile,
+                                      {String? referenceText}) async {
+  final formData = FormData.fromMap({
+    'audio': await MultipartFile.fromFile(
+      audioFile.path,
+      filename: path.basename(audioFile.path),
+    ),
+    if (referenceText != null) 'reference_text': referenceText,
+  });
+  final response = await dio.post('/api/v1/evaluate', data: formData);
+  return response.data as Map<String, dynamic>;
+}
+\end{lstlisting}
+
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 8: TROUBLESHOOTING
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Troubleshooting}
+
+\subsection{Inference Server Unreachable / 502 from Caddy}
+
+\phaseblocks{Diagnosis}{Caddy is up but the Go server cannot reach the Python container. Either the Python container is still loading the NeMo model (cold start can take 10\,min on first boot --- the wheel install plus model download) or the container has crashed.}
+
+\phaseblocks{Resolution}{\texttt{docker compose -f /opt/tahkik-server/docker-compose.yml logs python --tail=50}. Watch for \texttt{[inference] model ready (warmup <ms>)}. If you see Python-level tracebacks, restart with \texttt{docker compose restart python}.}
+
+\subsection{Model Download Timeout}
+
+\phaseblocks{Diagnosis}{First-time model download from HuggingFace can take several minutes on a slow link. The Python server prints \texttt{[inference] loading NeMo model \dots} and stays silent until the checkpoint is fully fetched into \texttt{/cache/nemo}.}
+
+\phaseblocks{Resolution}{Wait for the download to complete. Subsequent restarts use the cached weights in the \texttt{nemo\_cache} named volume.}
+
+\subsection{system-health Returns 503 / 401}
+
+\phaseblocks{Diagnosis}{\texttt{503} means \texttt{HEALTH\_TOKEN} is unset in the environment (the endpoint fails closed). \texttt{401} means the \texttt{Authorization: Bearer <token>} header doesn't match the value baked into \texttt{.env}.}
+
+\phaseblocks{Resolution}{Verify \texttt{grep HEALTH\_TOKEN /opt/tahkik-server/.env} on the droplet and ensure the same value is wired into the dashboard's \texttt{VITE\_TAHKIK\_HEALTH\_TOKEN}.}
+
+\subsection{Partial Latency Above the Window}
+
+\phaseblocks{Diagnosis}{Each partial transcribes 8\,s of audio. If inference itself takes longer than 8\,s, the stream falls behind real-time and the user experience degrades.}
+
+\phaseblocks{Resolution}{In order of preference: (1) reduce \texttt{PARTIAL\_WINDOW\_S} in \texttt{python/hf\_space/main.py} to 5; (2) raise \texttt{TORCH\_NUM\_THREADS} to the droplet's vCPU count; (3) move to a GPU droplet and apply \texttt{docker-compose.gpu.yml}.}
+
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 9: PERFORMANCE METRICS
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Performance Metrics}
+
+\section{Inference Latency by Hardware}
+
+The inference latency varies significantly between CPU and GPU droplets and between the partial-window and final inference paths. Measurements below were taken on the production droplet (\texttt{s-4vcpu-8gb}) for the CPU rows and on a single NVIDIA T4 for the GPU rows, using a 10-second Quranic audio sample (16\,kHz mono 16-bit WAV).
+
+\begin{table}[H]
+  \centering
+  \caption{Average inference latency by hardware (p50 / p95)}
+  \label{tab:perf_latency}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{llccc}
+    \toprule
+    \textbf{Path} & \textbf{Hardware} & \textbf{p50} & \textbf{p95} & \textbf{Throughput} \\
+    \midrule
+    Partial (8\,s window) & CPU 4-vcpu    & ${\sim}3.5$\,s & ${\sim}7.0$\,s & ${\sim}0.28$\,req/s \\
+    Final (10\,s audio)   & CPU 4-vcpu    & ${\sim}8.5$\,s & ${\sim}15$\,s  & ${\sim}0.12$\,req/s \\
+    Partial (8\,s window) & T4 GPU (FP16) & ${\sim}0.6$\,s & ${\sim}0.9$\,s & ${\sim}1.7$\,req/s  \\
+    Final (10\,s audio)   & T4 GPU (FP16) & ${\sim}1.2$\,s & ${\sim}1.8$\,s & ${\sim}0.85$\,req/s \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{infobox}[title=Key Observations]
+\begin{itemize}
+  \item The RNNT decoder dominates wall-time on CPU; GPU acceleration yields a ${\sim}6$--$8\times$ speedup on the same checkpoint.
+  \item Final inference is ${\sim}2$--$3\times$ slower than the partial because it processes the full (capped at 60\,s) buffer rather than the trailing 8\,s.
+  \item The Go API gateway introduces negligible overhead ($<$5\,ms per request) --- multipart parsing and HTTP proxying only.
+  \item Madd analysis adds 200--600\,ms on top of the inference time when \texttt{reference\_text} is provided (one extra CTC forward pass for forced alignment).
+\end{itemize}
+\end{infobox}
+
+\section{Processing Time Breakdown}
+
+For a typical 10-second audio file with \texttt{reference\_text} provided (production CPU droplet, end-to-end through Caddy + Go + Python):
+
+\begin{table}[H]
+  \centering
+  \caption{Request processing time breakdown (10\,s audio + madd, CPU)}
+  \label{tab:perf_breakdown}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{lcc}
+    \toprule
+    \textbf{Stage} & \textbf{Duration (ms)} & \textbf{Percentage} \\
+    \midrule
+    Caddy TLS termination \& routing      & ${\sim}10$    & 0.1\,\% \\
+    Go server parsing \& validation       & ${\sim}5$     & 0.1\,\% \\
+    Network transfer (Go $\rightarrow$ Python) & ${\sim}15$ & 0.2\,\% \\
+    Audio resampling (\texttt{librosa})   & ${\sim}45$    & 0.5\,\% \\
+    RNNT inference (NeMo, FastConformer)  & ${\sim}8\,200$ & 90.0\,\% \\
+    CTC forced alignment                  & ${\sim}500$   & 5.5\,\% \\
+    Madd analyser                         & ${\sim}120$   & 1.3\,\% \\
+    JSON serialisation \& return path     & ${\sim}30$    & 0.3\,\% \\
+    \midrule
+    \textbf{Total end-to-end}             & ${\sim}\mathbf{9\,100}$ & 100\,\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Model inference constitutes 90\,\% of total processing time, confirming that further performance work should target the ML backend (GPU upgrade, smaller checkpoint) rather than the API or analysis layers.
+
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 10: SCALABILITY AND LOAD HANDLING
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Scalability and Load Handling}
+
+\section{Current Concurrency Model}
+
+The Go API server handles concurrent HTTP connections natively through goroutines. The inference backend, however, intentionally serialises all model invocations via a module-level \texttt{asyncio.Semaphore(1)} plus a per-connection \texttt{asyncio.Lock} on the WebSocket path:
+
+\begin{warnbox}[title=Concurrency Limitations]
+\begin{itemize}
+  \item \textbf{Global inference semaphore}: One inference at a time across the entire Python process. Prevents CPU over-subscription and non-deterministic output ordering. Concurrent requests are queued.
+  \item \textbf{Single-worker Uvicorn}: The container runs one Uvicorn worker. Multi-process scaling would require multiple model copies --- ${\sim}500$\,MB of CPU RAM each --- which is infeasible on the baseline 8\,GB droplet.
+  \item \textbf{Model memory footprint}: The FastConformer checkpoint occupies ${\sim}500$\,MB of CPU RAM (or ${\sim}1.2$\,GB of GPU VRAM in FP16). Loading multiple instances scales linearly.
+\end{itemize}
+\end{warnbox}
+
+\section{Observed Behaviour Under Load}
+
+Under concurrent load on the CPU production droplet the system exhibits a predictable serial-queue pattern:
+
+\begin{table}[H]
+  \centering
+  \caption{Server behaviour under concurrent requests (CPU, 10\,s audio without madd)}
+  \label{tab:scale_load}
+  \renewcommand{\arraystretch}{1.3}
+  \small
+  \begin{tabular}{p{2.6cm}p{2.8cm}p{7.5cm}}
+    \toprule
+    \textbf{Concurrent Requests} & \textbf{Avg. Response Time} & \textbf{Behaviour} \\
+    \midrule
+    1   & ${\sim}8.5$\,s   & Normal \\
+    3   & ${\sim}25$\,s    & Queued (serial execution) \\
+    5   & ${\sim}42$\,s    & Queued, increased wait \\
+    10+ & ${\sim}85$\,s+   & High risk of client-side timeout (5\,min ceiling at the Go layer) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Scalability Improvement Strategies}
+
+\begin{goldbox}[title=Recommended Scalability Enhancements]
+\begin{itemize}
+  \item \textbf{GPU upgrade}: A single T4/L4 GPU droplet cuts final latency below 2\,s and lifts effective single-stream throughput by ${\sim}7\times$. The fastest unit-of-work improvement.
+  \item \textbf{Horizontal scaling}: Run multiple droplets behind a load balancer. Each droplet is fully self-contained (Caddy issues its own cert), so adding capacity is one-shot.
+  \item \textbf{Multi-worker Uvicorn (with care)}: Launch Uvicorn with \texttt{--workers N} only when RAM permits one model copy per worker. The semaphore stays per-process so concurrency is bounded by worker count.
+  \item \textbf{Bounded request queue}: Add a token-bucket or in-memory queue at the Go layer to reject excess work with \texttt{503 Service Unavailable} rather than accumulating unbounded latency.
+  \item \textbf{Batching on GPU}: On GPU hardware, batch multiple audio inputs in one forward pass to amortise the fixed kernel-launch overhead.
+\end{itemize}
+\end{goldbox}
+
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 11: SECURITY CONSIDERATIONS
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Security Considerations}
+
+\section{Transport Layer}
+
+Caddy terminates TLS using a Let's Encrypt certificate issued automatically on the first HTTPS request. Plain-text HTTP traffic on port 80 is redirected by Caddy's default behaviour. The Go and Python containers \emph{never} bind to a public address --- they expose ports only within the compose network.
+
+\section{Input Validation}
+
+The Go API gateway enforces multiple layers of input validation before any data reaches the inference backend:
+
+\begin{emeraldbox}[title=Validation Rules]
+\begin{itemize}
+  \item \textbf{HTTP method}: \texttt{/api/v1/evaluate} accepts only \texttt{POST}; other methods return \texttt{405 Method Not Allowed}.
+  \item \textbf{File size limit}: \texttt{r.ParseMultipartForm(50 << 20)} enforces a strict 50\,MB ceiling. Larger uploads return \texttt{400 Bad Request}.
+  \item \textbf{File-format whitelist}: Only five audio extensions are accepted (\texttt{.wav}, \texttt{.mp3}, \texttt{.m4a}, \texttt{.flac}, \texttt{.ogg}). Unrecognised extensions are rejected before any read past the multipart header.
+  \item \textbf{Limit-read of audio}: The handler wraps the form file in \texttt{io.LimitReader(file, 50<<20)} so a malformed multipart cannot stream past the declared ceiling.
+  \item \textbf{Format check at the backend}: The Python \texttt{/evaluate} handler re-checks the extension on the server side as defence-in-depth.
+\end{itemize}
+\end{emeraldbox}
+
+\section{Token Management}
+
+Two distinct secrets are managed exclusively on the server side:
+
+\begin{infobox}[title=Token Security Architecture]
+\begin{itemize}
+  \item \textbf{\texttt{HF\_TOKEN}}: Stored in \texttt{/opt/tahkik-server/.env} (mode 600) on the droplet. Injected into the Python container as an environment variable. Used to authenticate to HuggingFace when downloading private model weights. The Flutter app never sees it.
+  \item \textbf{\texttt{HEALTH\_TOKEN}}: Generated on first provisioning (\texttt{head -c 32 /dev/urandom | base64}, 40 chars). Required as a Bearer token on every \texttt{/api/v1/system-health} call and as a \texttt{?token=} query parameter on the WebSocket variant. The Go middleware fails closed (\texttt{503}) if the env var is unset, so the endpoint cannot accidentally become public.
+\end{itemize}
+\end{infobox}
+
+\section{Docker Socket Exposure}
+
+The Go container mounts \texttt{/var/run/docker.sock} read-only (\texttt{:ro}) to enumerate sibling containers for the system-health endpoint. Read-only mode prevents container creation, image manipulation, or any state-changing API call. The distroless \texttt{nonroot} user (UID 65532) is added to the host's docker group (GID 999) at runtime via \texttt{group\_add} so the socket is readable without granting root inside the container.
+
+\section{Abuse Prevention}
+
+\begin{table}[H]
+  \centering
+  \caption{Current protections and proposed enhancements}
+  \label{tab:security_measures}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{p{5cm}lp{5.5cm}}
+    \toprule
+    \textbf{Measure} & \textbf{Status} & \textbf{Description} \\
+    \midrule
+    TLS at edge (Let's Encrypt)            & Implemented & All client traffic encrypted by default \\
+    File size cap (50\,MB)                 & Implemented & Prevents oversized-upload resource exhaustion \\
+    Format whitelist                       & Implemented & Blocks arbitrary file uploads \\
+    Inference semaphore                    & Implemented & Natural throttle: 1 concurrent inference \\
+    HTTP timeout (5\,min)                  & Implemented & Prevents indefinite connection holding \\
+    Bearer-token gate on system-health     & Implemented & Operator-only endpoint \\
+    Distroless + nonroot Go container      & Implemented & No shell, no package manager, minimal attack surface \\
+    Rate limiting                          & Proposed    & Token-bucket at Caddy or Go layer \\
+    Per-client API keys                    & Proposed    & Identify and throttle individual mobile users \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+

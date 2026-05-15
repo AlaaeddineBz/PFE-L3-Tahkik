@@ -1,0 +1,693 @@
+\chapter{Implementation}
+\label{ch:implementation}
+
+\section{Introduction}
+This chapter presents the technical implementation of the Tahkik platform. We begin by introducing the languages and frameworks used across all system components, then walk through the realised interfaces of both the mobile application (\textit{Tahkik App}) and the web dashboard (\textit{Tahkik Dashboard}).
+
+\begin{infobox}[title=Scope of this Chapter]
+Two specialised components --- the \textbf{Go/Python inference server} and the \textbf{fine-tuned Whisper model} --- are described at a high level here and documented in depth in two companion technical reports that are appended to this dissertation:
+\begin{itemize}[leftmargin=2em]
+  \item \textit{Tahkik Inference Server --- Technical Report} (Go API gateway, FastAPI inference backend, faster-whisper / CTranslate2 runtime, WebSocket streaming protocol, Hugging Face Space deployment, performance \& security).
+  \item \textit{AI-Powered Quranic Recitation Analysis --- Implementation Report} (Warsh dataset preparation, data quality assurance pipeline, Whisper fine-tuning runs, WER results, model publication on Hugging Face Hub).
+\end{itemize}
+This chapter therefore concentrates on the two client-side components that are not covered elsewhere: the Flutter mobile application and the React web dashboard.
+\end{infobox}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Technologies and Frameworks}
+\label{sec:impl_tech}
+
+\begin{emeraldbox}[title=Technology Stack]
+The Tahkik platform is built on a modern, cross-platform stack that separates concerns across the mobile client, web dashboard, AI backend, and data layer. Each technology was chosen for its performance, community support, and fitness for the specific layer it serves.
+\end{emeraldbox}
+
+\subsection{Mobile Application — Flutter \& Dart}
+
+\begin{figure}[H]
+  \centering
+  \begin{minipage}[c]{0.18\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/tech/flutter.png}
+  \end{minipage}
+  \hspace{2em}
+  \begin{minipage}[c]{0.18\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/tech/dart.png}
+  \end{minipage}
+  \caption{Flutter and Dart logos}
+  \label{fig:impl_flutter_dart}
+\end{figure}
+
+\textbf{Flutter} is Google's open-source UI toolkit for building natively compiled applications for mobile, web, and desktop from a single codebase. The Tahkik mobile application targets Android and iOS learners and is built entirely in Flutter, enabling consistent UI and shared business logic across both platforms.
+
+\textbf{Dart} is the programming language underlying Flutter. Its strong typing, async/await model, and just-in-time compilation make it well suited for reactive UI development and real-time audio streaming.
+
+\subsection{Web Dashboard — React}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.18\textwidth]{figures/tech/react.png}
+  \caption{React logo}
+  \label{fig:impl_react}
+\end{figure}
+
+\textbf{React} is a declarative, component-based JavaScript library developed by Meta for building user interfaces. The Tahkik Dashboard — used by teachers and administrators — is a React single-page application that communicates with Supabase directly through its client SDK and with the Go server for AI-related operations.
+
+\subsection{Backend API — Go}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.22\textwidth]{figures/tech/golang.png}
+  \caption{Go logo}
+  \label{fig:impl_go}
+\end{figure}
+
+\textbf{Go} (Golang) is a statically typed, compiled language developed by Google, known for its simplicity and high concurrency performance. The Tahkik Go server acts as a lightweight REST gateway in front of the Python inference backend: it accepts batch audio uploads on \texttt{POST /api/v1/evaluate}, validates them, forwards them to the inference service, and exposes a Bearer-token-gated \texttt{GET /api/v1/system-health} endpoint (plus its WebSocket variant \texttt{/api/v1/system-health/ws}) that the web dashboard polls for live host, container, and inference telemetry. A public \texttt{GET /health} liveness probe is also provided for Caddy and Docker healthchecks. The complementary real-time WebSocket streaming path (\texttt{/ws/stream}) is served by the FastAPI inference backend directly to the mobile client; the Go server is intentionally kept stateless and proxy-free for streaming workloads. The full server architecture, request lifecycle, and deployment procedure are detailed in the companion \textit{Tahkik Inference Server} report.
+
+\subsection{AI Server — Python \& FastAPI}
+
+\begin{figure}[H]
+  \centering
+  \begin{minipage}[c]{0.18\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/tech/python.png}
+  \end{minipage}
+  \hspace{2em}
+  \begin{minipage}[c]{0.25\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/tech/fastapi.png}
+  \end{minipage}
+  \caption{Python and FastAPI logos}
+  \label{fig:impl_python_fastapi}
+\end{figure}
+
+\textbf{Python} is the leading language for machine learning and audio processing. The production AI backend runs NVIDIA's \textbf{NeMo FastConformer Hybrid CTC/RNNT} model (\texttt{nvidia/stt\_ar\_fastconformer\_hybrid\_large\_pcd\_v1.0}, $\sim$115\,M parameters), achieving 6.55\,\% WER on the EveryAyah Quran benchmark. It is deployed as a Docker container on a DigitalOcean droplet, behind the Caddy reverse proxy. For local development, a legacy PyTorch server backed by the fine-tuned Whisper checkpoint (\texttt{benhadjermed/tahkik-small-warsh}) is retained. The full fine-tuning pipeline --- Warsh dataset alignment, quality-assurance scripts, multi-reciter training runs and WER analysis --- is documented in the companion \textit{AI-Powered Quranic Recitation Analysis} report.
+
+\textbf{FastAPI} is a modern, high-performance Python web framework for building APIs with automatic OpenAPI documentation. It serves as the HTTP/WebSocket interface for the NeMo inference pipeline: it exposes \texttt{POST /evaluate} for batch audio (called by the Go gateway), \texttt{WS /ws/stream} for the real-time 8-second sliding-window streaming protocol consumed directly by the Flutter mobile client, and \texttt{GET /health} for liveness and metrics.
+
+\subsection{Backend-as-a-Service — Supabase}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.16\textwidth]{figures/tech/supabase.png}
+  \caption{Supabase logo}
+  \label{fig:impl_supabase}
+\end{figure}
+
+\textbf{Supabase} is an open-source Firebase alternative built on top of PostgreSQL. It provides the Tahkik platform with:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Authentication} — JWT-based email/password and Google Sign-In.
+  \item \textbf{Database} — PostgreSQL with Row Level Security (RLS) policies.
+  \item \textbf{Storage} — Audio file storage for submitted recitations.
+  \item \textbf{Real-time} — Live subscriptions for teacher notifications.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.14\textwidth]{figures/tech/postgresql.png}
+  \caption{PostgreSQL — underlying Supabase database engine}
+  \label{fig:impl_postgresql}
+\end{figure}
+
+\subsection{Technology Stack Summary}
+
+\begin{table}[H]
+  \centering
+  \caption{Summary of technologies used in the Tahkik platform}
+  \label{tab:impl_tech_summary}
+  \renewcommand{\arraystretch}{1.4}
+  \begin{tabular}{llp{7cm}}
+    \toprule
+    \textbf{Layer} & \textbf{Technology} & \textbf{Role} \\
+    \midrule
+    Mobile App     & Flutter / Dart            & Cross-platform learner application (iOS \& Android) \\
+    Web Dashboard  & React / TypeScript / Vite & Teacher and admin web interface \\
+    Backend API    & Go (\texttt{net/http})    & REST gateway, batch \texttt{/evaluate}, \texttt{/health} probe \\
+    AI Server      & Python / FastAPI          & NeMo FastConformer inference, WebSocket streaming \\
+    BaaS           & Supabase                  & Auth (JWT), PostgreSQL + RLS, Storage, Real-time \\
+    AI Runtime     & NVIDIA NeMo 2.0 (PyTorch) & FastConformer Hybrid CTC/RNNT inference engine \\
+    AI Model       & \texttt{nvidia/stt\_ar\_fastconformer\_hybrid\_large\_pcd\_v1.0} & 115\,M-param Arabic ASR, 6.55\,\% WER on EveryAyah \\
+    ML Hosting     & DigitalOcean Droplet (Docker Compose) & Single-host 3-container production stack (Caddy + Go + Python) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Mobile Application — Tahkik App}
+\label{sec:impl_mobile}
+
+\begin{emeraldbox}[title=Mobile Application]
+The Tahkik mobile application is the primary interface for learners. Built with Flutter targeting Android and iOS, it covers the complete learner journey: an onboarding tour, authentication and profile completion, a Warsh Quran reader, real-time recitation recording with WebSocket-based AI transcription, Tajweed feedback visualisation, progress tracking, account settings, and subscription management.
+\end{emeraldbox}
+
+% ─── Architecture & libraries ───────────────────────────────────────────────
+\subsection{Application Architecture and Libraries}
+\label{sec:impl_app_arch}
+
+The mobile application is structured as a feature-first, layered Flutter project. Each feature module (\texttt{auth}, \texttt{onboarding}, \texttt{home}, \texttt{quran\_reader}, \texttt{recitation}, \texttt{tajweed\_feedback}, \texttt{progress}, \texttt{settings}, \texttt{subscription}) is split into \texttt{data/}, \texttt{domain/}, \texttt{presentation/} and \texttt{providers/} sub-folders, while cross-cutting concerns live under \texttt{core/} and \texttt{shared/}.
+
+\begin{table}[H]
+  \centering
+  \caption{Key libraries used by the Tahkik mobile application}
+  \label{tab:impl_app_libs}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{lp{4.2cm}p{6cm}}
+    \toprule
+    \textbf{Concern} & \textbf{Package} & \textbf{Role in the app} \\
+    \midrule
+    State management & \texttt{flutter\_riverpod}, \texttt{riverpod\_annotation} & Reactive providers for auth, audio, transcription \\
+    Navigation       & \texttt{go\_router}                & Declarative routing with redirect-based auth guards \\
+    HTTP client      & \texttt{dio}                       & REST calls to the Go gateway with JWT Bearer interceptor \\
+    Realtime stream  & \texttt{web\_socket\_channel}      & Streaming PCM audio to the inference WebSocket \\
+    Audio I/O        & \texttt{record}, \texttt{audioplayers} & Microphone capture and playback for review \\
+    Auth backend     & \texttt{supabase\_flutter}, \texttt{google\_sign\_in} & JWT auth with email/password and Google OAuth \\
+    Local storage    & \texttt{hive\_flutter}, \texttt{shared\_preferences} & Offline cache for verses, preferences, session data \\
+    Config           & \texttt{flutter\_dotenv}           & Loads \texttt{API\_BASE\_URL}, \texttt{HF\_SPACE\_URL}, Supabase keys \\
+    Charts           & \texttt{fl\_chart}                 & Progress and streak visualisations \\
+    Typography \& UI & \texttt{google\_fonts}, \texttt{flutter\_svg}, \texttt{shimmer}, \texttt{cached\_network\_image} & Latin/Arabic fonts, SVG icons, skeletons, image cache \\
+    File system      & \texttt{path\_provider}            & Temporary storage for recorded audio \\
+    Serialisation    & \texttt{json\_annotation}, \texttt{json\_serializable} & Generated codecs for API DTOs \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{infobox}[title=Custom Warsh Font]
+The Mushaf reader renders verses using the official \textbf{King Fahd Glorious Quran Printing Complex} Warsh font, bundled as the \texttt{KFGQPC\_Warsh.ttf} asset (declared under the \texttt{QuranWarsh} family in \texttt{pubspec.yaml}). This guarantees that ligatures, sukoon, tanween, and Warsh-specific orthographic glyphs (e.g.\ Alef Maqsura variants) render exactly as in a printed Mushaf.
+\end{infobox}
+
+\subsection{API Layer and Authenticated Requests}
+
+The \texttt{ApiClient} wraps a single Dio instance configured against \texttt{API\_BASE\_URL} (default \texttt{https://api.tahkik.app/v1}). A custom interceptor automatically attaches the current Supabase session as an \texttt{Authorization: Bearer <JWT>} header on every request, so feature repositories never have to handle credentials manually. The most relevant REST endpoints consumed by the app are summarised below; the streaming WebSocket (\texttt{wss://<hf-space>/ws/stream}) is described in the companion server report.
+
+\begin{table}[H]
+  \centering
+  \caption{REST endpoints consumed by the Flutter client}
+  \label{tab:impl_app_endpoints}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{llp{6.5cm}}
+    \toprule
+    \textbf{Group} & \textbf{Endpoint} & \textbf{Purpose} \\
+    \midrule
+    Recitation & \texttt{POST /recitation/analyze} & Batch audio evaluation (fallback to streaming) \\
+    Recitation & \texttt{GET /recitation/history}  & Past submissions for the current user \\
+    Quran      & \texttt{GET /quran/surahs}        & List of Surahs metadata \\
+    Quran      & \texttt{GET /quran/surahs/\{n\}/ayahs} & Ayahs for a given Surah \\
+    User       & \texttt{GET /user/profile}, \texttt{GET /user/progress} & Profile and aggregated stats \\
+    Subscription & \texttt{GET /subscription/plans}, \texttt{POST /subscription/subscribe} & Tiers and purchase \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Navigation Shell}
+
+A \texttt{ShellRoute} hosts the four primary tabs of the application, with the bottom navigation bar (\texttt{TahkikBottomNav}) reacting to the current GoRouter location.
+
+\begin{table}[H]
+  \centering
+  \caption{Bottom navigation tabs of the Tahkik app}
+  \label{tab:impl_app_tabs}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{llp{7cm}}
+    \toprule
+    \textbf{Route} & \textbf{Tab} & \textbf{Purpose} \\
+    \midrule
+    \texttt{/}          & Home     & Daily verse, streak, quick practice entry \\
+    \texttt{/practice}  & Practice & Surah/ayah selection and live recitation \\
+    \texttt{/progress}  & Progress & Charts, streaks, recent sessions, scores \\
+    \texttt{/settings}  & Settings & Account, display, riwaya, daily goal \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The router's \texttt{redirect} hook enforces the full auth flow: unauthenticated users are sent to \texttt{/onboarding}; authenticated users with an incomplete profile are routed to \texttt{/complete-profile}; only fully-onboarded users reach the shell routes above. The redirect listens to \texttt{authStateProvider} so it re-evaluates on every Supabase auth event.
+
+% ─── Onboarding ─────────────────────────────────────────────────────────────
+\subsection{Onboarding Flow}
+
+First-time visitors land on the \textbf{Get Started} screen which introduces the platform and gates entry to the rest of the funnel. A second \textbf{AI Feedback Onboarding} screen explains how recitation is recorded, transcribed by the AI, and reviewed by a teacher --- setting accurate expectations about real-time partial transcription and confidence scoring.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.45\textwidth,keepaspectratio]{Onboarding screen.png}
+  \caption{Get Started --- intro to the Tahkik platform}
+  \label{fig:screen_onboarding}
+\end{figure}
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.45\textwidth,keepaspectratio]{AI Feedback onboarding.png}
+  \caption{AI Feedback onboarding --- how live transcription and teacher review work}
+  \label{fig:screen_ai_feedback_onboarding}
+\end{figure}
+
+% ─── Auth screens ───────────────────────────────────────────────────────────
+\subsection{Authentication Screens}
+
+The authentication flow combines Supabase email/password and Google Sign-In (via the \texttt{google\_sign\_in} package). A dedicated \textbf{Create Account} screen handles registration with form validation, while the \textbf{Complete Profile} screen captures the three fields required by the rest of the app:
+
+\begin{itemize}[leftmargin=2em]
+  \item \texttt{full\_name} --- displayed across the UI and on Ijaza certificates
+  \item \texttt{preferred\_riwaya} --- \emph{Warsh} or \emph{Hafs}, persisted in the user metadata
+  \item \texttt{daily\_goal\_minutes} --- drives the streak/goal logic on the Home and Progress screens
+\end{itemize}
+
+The \texttt{profileCompleteProvider} reads these fields from \texttt{user.userMetadata} and re-evaluates after every \texttt{AuthChangeEvent.userUpdated}, ensuring the router immediately redirects out of \texttt{/complete-profile} once the form is submitted.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.45\textwidth,keepaspectratio]{Login .png}
+  \caption{Login --- email/password and Google Sign-In}
+  \label{fig:screen_login}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.45\textwidth,keepaspectratio]{Sign-up.png}
+  \caption{Sign-up --- account creation with preferred Riwaya and daily goal}
+  \label{fig:screen_signup}
+\end{figure}
+
+% ─── Home ───────────────────────────────────────────────────────────────────
+\subsection{Home Screen}
+
+The Home screen is the daily landing page. It surfaces the curated \textbf{Daily Verse} (managed from the admin dashboard's Daily Verse module), the user's current streak and daily-goal progress ring, a "Continue practising" shortcut to the last surah, and a vertical scroll of recently-recited ayahs with their AI scores.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth,keepaspectratio]{Home .png}
+  \caption{Home --- daily verse, streak, continue practising}
+  \label{fig:screen_home}
+\end{figure}
+
+% ─── Quran Reader ──────────────────────────────────────────────────────────
+\subsection{Quran Reader --- Mushaf Page View}
+
+The Mushaf Page View renders the Quran one Mushaf page at a time using the custom Warsh font. A \texttt{PageView} swipes between the 604 standard Mushaf pages, and a \textbf{Page Jump Sheet} lets the user jump directly to a surah or page number via a searchable bottom sheet. Verse boundaries are tappable: long-press selects a range, single-tap opens a context menu with \emph{Practise this verse}, \emph{Listen}, and \emph{Bookmark}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth,keepaspectratio]{Quran Reader.png}
+  \caption{Quran Reader --- Mushaf page with Warsh script}
+  \label{fig:screen_quran_reader}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.45\textwidth,keepaspectratio]{Page Jump Sheet .png}
+  \caption{Page Jump Sheet --- search by surah or page}
+  \label{fig:screen_page_jump}
+\end{figure}
+
+% ─── Practice ───────────────────────────────────────────────────────────────
+\subsection{Practice Screen and Tajweed Feedback}
+
+The Practice screen is the core feature of the app. The user selects a verse range, then a large \textbf{Microphone FAB} (\texttt{microphone\_fab.dart}) starts recording with the \texttt{record} package at 16~kHz PCM. A live \textbf{Waveform Visualiser} animates while audio chunks are streamed over WebSocket to the inference service. Partial transcriptions arrive every $\sim$1\,s and are overlaid in real time on the corresponding \textbf{Ayah Card}. A \textbf{Practice Theme Selector} lets the user switch between calm, focus and traditional colour palettes.
+
+When recording stops, the final result --- transcription, confidence score, and per-word Tajweed annotations --- is rendered by the \texttt{tajweed\_feedback} module:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Overall Score widget}: animated radial gauge showing the confidence percentage.
+  \item \textbf{Tajweed Overlay}: highlights each word with a colour reflecting the detected error category (madd, ghunnah, qalqalah, etc.).
+  \item \textbf{Error Detail Sheet}: a bottom sheet that, when a highlighted word is tapped, explains the rule, plays the correct pronunciation, and proposes a corrective exercise.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth,keepaspectratio]{Practice .png}
+  \caption{Practice --- ayah card, microphone FAB and waveform}
+  \label{fig:screen_practice}
+\end{figure}
+
+
+
+
+
+% ─── Progress ───────────────────────────────────────────────────────────────
+\subsection{Progress Screen}
+
+The Progress screen aggregates the learner's data via the \texttt{/user/progress} endpoint and renders it with \texttt{fl\_chart}: a 30-day line chart of minutes recited, a bar chart of average scores per surah, a streak calendar, and a recent-sessions list. Each session row links back to the corresponding Practice result so the user can replay the audio and re-read the Tajweed feedback.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.55\textwidth,keepaspectratio]{Progress .png}
+  \caption{Progress --- streak, minutes recited and average scores}
+  \label{fig:screen_progress}
+\end{figure}
+
+% ─── Settings ───────────────────────────────────────────────────────────────
+\subsection{Settings, Personal Info and Display Settings}
+
+The Settings tab is the user's control centre. It groups account, preference and support items, and opens dedicated screens for the most detailed configuration:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Personal Info screen} --- edit full name, email, avatar, and update Supabase user metadata.
+  \item \textbf{Display Settings modal} --- font size, line height, day/night theme, optional tashkeel display, and reciter audio preference for verse playback. Preferences are persisted via \texttt{shared\_preferences} so they survive cold starts.
+  \item \textbf{Riwaya selector} --- switch between Warsh and Hafs; updates \texttt{preferred\_riwaya} in the user metadata.
+  \item \textbf{Daily goal selector} --- adjusts the target minutes per day used by the Home streak ring.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth,keepaspectratio]{Settings .png}
+  \caption{Settings --- account, preferences and support}
+  \label{fig:screen_settings}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth,keepaspectratio]{Personal Info.png}
+  \caption{Personal Info --- edit profile fields}
+  \label{fig:screen_personal_info}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth,keepaspectratio]{Display Settings modal .png}
+  \caption{Display Settings modal --- font, theme and recitation preferences}
+  \label{fig:screen_display_settings}
+\end{figure}
+
+% ─── Subscription ──────────────────────────────────────────────────────────
+\subsection{Subscription --- Choose Plan}
+
+A dedicated \textbf{Choose Plan} screen (\texttt{choose\_plan\_screen.dart}, reached via the \texttt{/plan} route) compares the Free and Premium tiers side by side: number of AI feedbacks per day, access to a personal teacher, ability to receive an Ijaza certificate, and access to advanced analytics. Plan metadata is fetched from \texttt{/subscription/plans} and purchases are submitted via \texttt{/subscription/subscribe}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth,keepaspectratio]{Choose Plan.jpeg}
+  \caption{Choose Plan --- Free vs Premium comparison}
+  \label{fig:screen_choose_plan}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Web Dashboard — Tahkik Dashboard}
+\label{sec:impl_dashboard}
+
+\begin{emeraldbox}[title=Web Dashboard]
+The Tahkik Dashboard is a React~18 + TypeScript single-page application built with Vite, React Router v6 (data router), TanStack Query~v5 for server state, and Recharts for visualisations. It is the unified entry point for both administrators and teachers --- role-based routing redirects each authenticated user to the appropriate workspace based on their record in the \texttt{admins} table. The dashboard talks directly to Supabase for authentication, database reads/writes, and real-time subscriptions, and consults the Tahkik Go server (\texttt{VITE\_TAHKIK\_SERVER\_URL}) for live inference telemetry. Styling is built on CSS Modules with a tokenised light/dark theme, and the test suite uses Vitest + React Testing Library.
+\end{emeraldbox}
+
+% ─── Dashboard architecture & libraries ────────────────────────────────────
+\subsection{Application Architecture and Libraries}
+
+The dashboard follows a feature-first folder layout under \texttt{src/}: a small \texttt{app/} shell wires the router, providers, an \texttt{ErrorBoundary}, and a \texttt{RequireAuth} guard; cross-feature primitives live in \texttt{components/}; per-domain pages live under \texttt{features/auth}, \texttt{features/admin}, and \texttt{features/teacher}; and the data layer is split between \texttt{lib/queries/} (read hooks) and \texttt{lib/mutations/} (write hooks). Theming tokens are defined once under \texttt{theme/tokens.css} and consumed everywhere via CSS Modules.
+
+\begin{table}[H]
+  \centering
+  \caption{Key libraries used by the Tahkik web dashboard}
+  \label{tab:impl_dash_libs}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{lp{4.2cm}p{6cm}}
+    \toprule
+    \textbf{Concern} & \textbf{Package} & \textbf{Role in the dashboard} \\
+    \midrule
+    Build / dev server & \texttt{vite}, \texttt{typescript} & Fast HMR, type-checked production build \\
+    UI framework       & \texttt{react}, \texttt{react-dom} & Component-based UI \\
+    Routing            & \texttt{react-router-dom} (v6 data router) & Role-based layouts, nested routes, loaders \\
+    Server state       & \texttt{@tanstack/react-query} (v5) & Cached reads, optimistic mutations, real-time invalidation \\
+    Auth \& DB         & \texttt{@supabase/supabase-js} & JWT auth, PostgreSQL with RLS, real-time channels \\
+    Charts             & \texttt{recharts} & Line, donut and bar charts \\
+    Toasts             & \texttt{sonner} & Non-blocking notifications and alert strip \\
+    Styling            & CSS Modules + \texttt{theme/tokens.css} & Scoped styles, light/dark theme variables \\
+    Testing            & \texttt{vitest}, \texttt{@testing-library/react}, \texttt{jsdom} & Unit and component tests \\
+    Tooling            & \texttt{eslint}, \texttt{prettier} & Linting and formatting \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Application Shell, Auth Guard and Error Boundary}
+
+The router is built with React Router's \emph{data router} API. A top-level \texttt{ErrorBoundary} catches rendering and loader exceptions and surfaces a friendly retry screen, while \texttt{RequireAuth} wraps every protected route, subscribing to \texttt{AuthProvider} to enforce the following invariants:
+
+\begin{itemize}[leftmargin=2em]
+  \item Unauthenticated visitors are redirected to \texttt{/login}.
+  \item Authenticated users without a matching row in the \texttt{admins} table are sent to \texttt{/unauthorized}.
+  \item Visiting \texttt{/} redirects an admin to \texttt{/admin} and a teacher to \texttt{/teacher}, based on the \texttt{role} column.
+\end{itemize}
+
+\texttt{AuthProvider} listens to \texttt{supabase.auth.onAuthStateChange} and exposes \texttt{\{ user, role, isLoading \}} to the rest of the tree via React context, so every page consumes a single source of truth for authentication.
+
+\subsection{Styling and Light/Dark Theme}
+
+All visual tokens (colours, spacing, radii, typography, shadow, transition durations) are declared as CSS custom properties in \texttt{theme/tokens.css}. A \texttt{ThemeProvider} toggles a \texttt{data-theme} attribute on the document root between \texttt{light} and \texttt{dark}, and components consume the tokens through scoped CSS Modules. Skeleton loaders (\texttt{Skeleton}, \texttt{SkeletonPage}, \texttt{SkeletonShell}) reuse the same tokens so the loading state is visually consistent across pages.
+
+\subsection{Shared Component Library}
+
+A small but consistent set of primitives is reused across both workspaces:
+
+\begin{table}[H]
+  \centering
+  \caption{Shared UI components}
+  \label{tab:impl_dash_components}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{lp{8.5cm}}
+    \toprule
+    \textbf{Component} & \textbf{Purpose} \\
+    \midrule
+    \texttt{Card}, \texttt{StatCard}     & Containers for grouped information and KPI tiles \\
+    \texttt{Button}, \texttt{Input}, \texttt{Badge} & Form controls and pill-shaped status indicators \\
+    \texttt{Avatar}                       & User avatar with fallback initial \\
+    \texttt{LineChart}, \texttt{DonutChart} & Thin wrappers around Recharts \\
+    \texttt{ProgressBar}                  & Linear progress with token-driven colours \\
+    \texttt{Sidebar}, \texttt{Topbar}     & Layout chrome shared by Admin and Teacher \\
+    \texttt{Skeleton}, \texttt{SkeletonPage}, \texttt{SkeletonShell}, \texttt{LoadingSkeleton} & Granular loading placeholders \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Data Layer --- TanStack Query Hooks}
+
+Every page is hydrated through TanStack Query hooks split by domain:
+
+\begin{itemize}[leftmargin=2em]
+  \item \texttt{lib/queries/admin.ts}: \texttt{useAdminOverview}, \texttt{useAdminUsers}, \texttt{useAdminTeachers}, \texttt{useAdminSubscriptions}, \texttt{useAdminAnalytics}, etc.
+  \item \texttt{lib/queries/teacher.ts}: \texttt{useTeacherOverview}, \texttt{useTeacherStudents}, \texttt{useStudentDetail}, \texttt{useRecitationQueue}.
+  \item \texttt{lib/queries/messages.ts} and \texttt{useMessagesRealtime}: backed by a Supabase real-time channel for in-app chat.
+  \item \texttt{lib/queries/certificates.ts} and \texttt{lib/queries/daily-verses.ts}: read hooks for the Ijaza and Daily Verse modules.
+  \item \texttt{lib/mutations/}: write counterparts for teacher assignment, certificate issuance, and message sending, all using TanStack Query's \texttt{onSuccess} cache invalidation to keep the UI in sync.
+\end{itemize}
+
+\subsection{Environment Configuration}
+
+The dashboard reads its configuration from Vite environment variables (\texttt{import.meta.env}); a sample is provided as \texttt{.env.example}.
+
+\begin{table}[H]
+  \centering
+  \caption{Dashboard environment variables}
+  \label{tab:impl_dash_env}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{lp{8.5cm}}
+    \toprule
+    \textbf{Variable} & \textbf{Purpose} \\
+    \midrule
+    \texttt{VITE\_SUPABASE\_URL}        & Project URL for the Supabase client \\
+    \texttt{VITE\_SUPABASE\_ANON\_KEY}  & Anonymous JWT signing key \\
+    \texttt{VITE\_TAHKIK\_SERVER\_URL}  & Base URL of the Go inference gateway (live AI \& System Health card); when empty the page falls back to Supabase-only counters \\
+    \texttt{VITE\_TAHKIK\_HEALTH\_TOKEN} & Optional Bearer token for the \texttt{/health} endpoint of the Go server \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Authentication — Login Screen}
+
+The login screen offers two authentication paths: classic email/password and Google OAuth Sign-In. Both flows are handled by the Supabase Auth SDK (\texttt{signInWithPassword}, \texttt{signInWithOAuth}). After successful authentication, the \texttt{AuthProvider} verifies the user's role against the \texttt{admins} table and routes them to either \texttt{/admin} or \texttt{/teacher}. Users without a record land on \texttt{/unauthorized}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth,keepaspectratio]{Login screen.png}
+  \caption{Dashboard Login screen --- email/password and Google Sign-In}
+  \label{fig:dash_login}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Admin Workspace}
+
+The administrator workspace exposes seven pages: Overview, User Management, Teachers, Subscriptions, AI \& System Health, Analytics, and Daily Verse. All data is fetched live from Supabase via TanStack Query hooks (\texttt{useAdminOverview}, \texttt{useAdminUsers}, \texttt{useAdminTeachers}, etc.), and the Tahkik Go server is polled for real-time inference telemetry.
+
+\subsubsection{Admin Overview}
+
+The Overview page summarises the platform at a glance with four key statistics — Total Users, Premium Subscriptions, Minutes Recited Today, and Inference Server status — followed by a 30-day usage trend, a tier-distribution donut chart, and the most recent recitation submissions. The Go-server status indicator turns green when the \texttt{/health} endpoint responds with \texttt{ok}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,keepaspectratio]{Admin Overview.png}
+  \caption{Admin Overview --- platform statistics and 30-day usage trend}
+  \label{fig:dash_overview}
+\end{figure}
+
+\subsubsection{User Management}
+
+Lists all registered accounts with their display name, email, role, subscription plan, join date, and status. A search box filters the list client-side, and the table is fed by the \texttt{useAdminUsers} TanStack Query hook reading directly from Supabase with the appropriate RLS policies.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,keepaspectratio]{Admin User Management.png}
+  \caption{Admin User Management --- searchable user list}
+  \label{fig:dash_user_management}
+\end{figure}
+
+\subsubsection{Teachers Management}
+
+The Teachers page lets administrators promote existing users to teachers, view each teacher's roster, assign or unassign students, and demote teachers when needed. The "Add Teacher" button opens a dialog (\texttt{AddTeacherDialog}) that creates the \texttt{admins} record in Supabase and immediately reflects in the list via TanStack Query cache invalidation.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,keepaspectratio]{Admin Teachers.png}
+  \caption{Admin Teachers --- manage teacher accounts and student assignments}
+  \label{fig:dash_teachers}
+\end{figure}
+
+\subsubsection{Subscriptions}
+
+Displays the two subscription tiers (Free and Premium) with the number of users on each, the feature breakdown (e.g.\ AI feedback limits, teacher pairing, Ijaza certificates), and the monthly price. The counts come from the live Supabase profile data via \texttt{useAdminSubscriptions}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth,keepaspectratio]{Admin Subscriptions.png}
+  \caption{Admin Subscriptions --- tier overview and user distribution}
+  \label{fig:dash_subscriptions}
+\end{figure}
+
+\subsubsection{AI \& System Health}
+
+This is the live operations console for the Tahkik AI pipeline. The dashboard polls the Go server's health endpoint and renders:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Host metrics} --- CPU, memory, disk, and swap utilisation with critical/warning thresholds.
+  \item \textbf{Inference latency} --- partial and final p95 latency in milliseconds.
+  \item \textbf{Request stats} --- total and failed request counts with derived error-rate alerts.
+  \item \textbf{Container health} --- Docker container status (running, unhealthy, exited).
+  \item \textbf{Live alert strip} --- automatically raises a Sonner toast when a metric crosses the critical threshold.
+\end{itemize}
+
+When \texttt{VITE\_TAHKIK\_SERVER\_URL} is unset, the page gracefully falls back to Supabase-only counters so the dashboard remains usable in environments without the inference server.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth,keepaspectratio]{Admin AI & System Health.png}
+  \caption{Admin AI \& System Health --- live telemetry from the Tahkik Go server}
+  \label{fig:dash_ai_health}
+\end{figure}
+
+\subsubsection{Analytics}
+
+The Analytics page summarises platform-wide engagement: total minutes recited (all time), certificates issued, active teachers, and the most-practiced surah. A 30-day Usage Trend line chart, rendered with Recharts, plots minutes recited across all users.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,keepaspectratio]{Admin Analytics .png}
+  \caption{Admin Analytics --- usage trend and engagement metrics}
+  \label{fig:dash_analytics}
+\end{figure}
+
+\subsubsection{Daily Verse}
+
+Allows administrators to curate the daily verse displayed on the mobile home screen. A form accepts the Arabic text, English translation, surah name, and ayah number; submitting the form creates the verse and optionally promotes it to active. The page also lists previously published verses, allowing one-click reactivation or deletion.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,keepaspectratio]{Admin Daily Verse .png}
+  \caption{Admin Daily Verse --- manage the rotating daily ayah}
+  \label{fig:dash_daily_verse}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Teacher Workspace}
+
+The teacher workspace contains five pages: Overview, My Students, Recitation Review, Ijaza Certificates, and Messages. Each teacher only sees data scoped to their assigned students through Supabase Row Level Security.
+
+\subsubsection{Teacher Overview}
+
+Welcomes the teacher with an Arabic greeting and shows four stat cards: Assigned Students, Recent Sessions (last 7 days), Certificates Issued, and Average Score across all students. Below the stats, a feed lists the most recent recitations submitted for review.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,keepaspectratio]{Teacher Overview.png}
+  \caption{Teacher Overview --- daily snapshot of the teacher's roster}
+  \label{fig:dash_teacher_overview}
+\end{figure}
+
+\subsubsection{My Students and Student Detail}
+
+The \textbf{My Students} page renders the teacher's full roster: each card shows the student's avatar, name, last-active timestamp, current streak, and a small badge for their average score. Clicking a student navigates to a dedicated \textbf{Student Detail} route (\texttt{teacher/StudentDetail.tsx}, hydrated by the \texttt{useStudentDetail} query), which expands the snapshot into a full profile: last surah practised, average score, streak history, the most recent recitations queued for review, and a progress bar against the daily goal.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,keepaspectratio]{Teacher My Students.png}
+  \caption{Teacher My Students --- roster of assigned students}
+  \label{fig:dash_students}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,keepaspectratio]{Student Detail.png}
+  \caption{Student Detail --- per-student profile, session history and manual feedback panel (right pane)}
+  \label{fig:dash_student_detail}
+\end{figure}
+
+\subsubsection{Recitation Review}
+
+The core teaching tool. The left pane lists every submission queued for review; selecting one loads the audio player, the AI transcription, the confidence score, and the list of detected Tajweed annotations. The teacher can play/pause audio, scrub the progress bar, and override the AI verdict on individual annotations.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth,keepaspectratio]{Teacher Recitation Review.png}
+  \caption{Teacher Recitation Review --- audio player, AI Tajweed analysis and override controls}
+  \label{fig:dash_recitation_review}
+\end{figure}
+
+\subsubsection{Ijaza Certificates and Printable View}
+
+Teachers can issue digital Ijaza certificates to qualifying students. An \textbf{Issue} form accepts the student, the surah, the riwaya (Warsh / Hafs), and optional notes; submission is committed via a \texttt{useIssueCertificate} mutation in \texttt{lib/mutations/certificates.ts}. Previously issued certificates are listed below and each opens a dedicated route (\texttt{teacher/IjazaCertificate.tsx}) that renders the certificate as a printable document: ornamented border, the teacher's and student's names, the surah, the riwaya, the issue date, and a unique reference identifier. The page is print-stylesheet aware, so \texttt{Cmd/Ctrl + P} produces a clean, single-page A4 output.
+
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth,keepaspectratio]{Ijaza Certificate detail.png}
+  \caption{Ijaza Certificate detail --- printable certificate view}
+  \label{fig:dash_ijaza_detail}
+\end{figure}
+
+\subsubsection{Messages}
+
+Direct messaging between teacher and student. The left column lists the teacher's students; selecting one opens the conversation thread. Messages are stored in Supabase and the page subscribes to a real-time channel (\texttt{useMessagesRealtime}) so incoming replies appear without a manual refresh. Outgoing messages use a \texttt{useSendMessage} mutation that optimistically appends the message and rolls back on error.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth,keepaspectratio]{Teacher Messages.png}
+  \caption{Teacher Messages --- real-time chat with assigned students}
+  \label{fig:dash_messages}
+\end{figure}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Demo and Stub UI Disclosure}
+
+Several controls were retained from the visual prototype to preserve UX parity even though their backend wiring is still in progress. They are kept visible so the design intent is preserved, but the user-facing copy and behaviour clearly mark them as inert until the corresponding feature ships:
+
+\begin{table}[H]
+  \centering
+  \caption{Currently inert (stub) UI elements}
+  \label{tab:impl_dash_stubs}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{lp{8cm}}
+    \toprule
+    \textbf{Element} & \textbf{Status} \\
+    \midrule
+    AI metric cards on Admin Overview & Render fixed values from a \texttt{DEMO\_METRICS} constant until the Go server's metrics endpoint is consumed \\
+    Email column on Admin Users        & Visual placeholder until the protected \texttt{auth.users} table is exposed via an RLS-safe view \\
+    Send Feedback button (Recitation Review) & Awaiting the feedback-mutation endpoint \\
+    Override (Tajweed annotation)            & Local-only override; persistence pending the teacher-overrides table \\
+    Print / Export PDF on certificates & Falls back to the browser's print stylesheet for now \\
+    Grant / Revoke subscription tier   & Awaiting the billing webhook integration \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Testing}
+
+The dashboard ships a Vitest + React Testing Library setup under \texttt{tests/}. \texttt{jsdom} provides the browser-like environment, \texttt{@testing-library/user-event} drives user interactions, and \texttt{@testing-library/jest-dom} adds the standard DOM matchers. The suite is executed with \texttt{npm test} (one-shot) or \texttt{vitest --watch} during development and runs in CI alongside \texttt{npm run typecheck} and \texttt{npm run lint}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+This chapter presented the full technology stack powering the Tahkik platform and the realised interfaces of both the mobile application and the web dashboard. The Flutter app combines Riverpod, GoRouter, Dio, \texttt{web\_socket\_channel} and the custom KFGQPC Warsh font to deliver a complete learner journey from onboarding to subscription. The React dashboard layers TanStack Query, Recharts, CSS Modules and Sonner on top of Supabase to give administrators and teachers a unified, live, and accessible operations console. The Go gateway and the fine-tuned Whisper inference service form the AI backbone --- a backbone whose internals, training procedure, and deployment topology are detailed in the two companion technical reports appended to this dissertation.

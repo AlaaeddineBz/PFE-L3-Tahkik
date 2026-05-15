@@ -1,0 +1,15 @@
+Figure 3.1: Flutter and Dart logos
+Figure 3.2: React logo
+Figure 3.3: Go logo
+Figure 3.4: Python and FastAPI logos
+Figure 3.5: Supabase logo
+Figure 3.6: PostgreSQL — underlying Supabase database engine
+Figure 3.7: Get Started — intro to the Tahkik platform
+Figure 3.8: Login — email/password and Google Sign-In
+Figure 3.9: Sign-up — account creation with preferred Riwaya and daily goal
+Figure 3.10: Admin Overview — platform statistics and 30-day usage trend
+Figure 3.11: Admin User Management — searchable user list
+Figure 3.12: Admin AI & System Health — live telemetry from the Tahkik Go server
+Figure 3.13: Teacher My Students — roster of assigned students
+Figure 3.14: Student Detail — per-student proﬁle, session history and manual feedback
+Figure 3.15: Teacher Recitation Review — audio player, AI Tajweed analysis and override

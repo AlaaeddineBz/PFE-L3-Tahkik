@@ -1,0 +1,125 @@
+% ════════════════════════════════════════════════════════════════════════════
+%  GENERAL CONCLUSION (Combined Edition)
+% ════════════════════════════════════════════════════════════════════════════
+\chapter*{General Conclusion}
+\addcontentsline{toc}{chapter}{General Conclusion}
+\label{ch:general_conclusion}
+
+The primary objective of this Final Year Project was to design, develop,
+and deploy a comprehensive digital platform dedicated to the learning and
+perfection of Quranic recitation and Tajweed rules. Through the
+development of \textbf{Tahkik}, we have demonstrated how modern technology
+--- specifically Artificial Intelligence, cross-platform mobile
+development, and cloud-based backend services --- can be leveraged to
+address the traditional challenges of accessibility and personalised
+feedback in Islamic education.
+
+\section*{Synthesis Across the Three Parts}
+
+The Tahkik project covers three interconnected components that together
+describe the system end-to-end:
+
+\begin{itemize}
+  \item \textbf{Part~I --- Tahkik Mobile and Web Platform.}
+        Chapters~\ref{ch:state_of_art} to \ref{ch:implementation}
+        survey the existing Quranic e-learning landscape, model the
+        platform with UML, and document the implementation of the Flutter
+        mobile application and the React administrator/teacher
+        dashboard, both backed by Supabase.
+  \item \textbf{Part~II --- Tahkik Inference Server.}
+        The technical report walks through the three-container Docker
+        Compose stack (Caddy reverse proxy, Go API gateway, Python
+        FastAPI inference service) that exposes the AI capabilities to
+        the mobile client. It details the API contracts, the Madd
+        Tajweed analyser based on CTC forced alignment, the
+        \texttt{provision-droplet.sh} deployment workflow, and the
+        operational concerns (security, scalability, observability).
+  \item \textbf{Part~III --- AI-Powered Quranic Recitation Analysis.}
+        The companion AI/ML report documents the Warsh dataset
+        construction (13{,}024 verse-level audio--text pairs across
+        three reciters), the data quality-assurance loop, and the two
+        Whisper fine-tuning runs, culminating in a checkpoint that
+        reduces the WER from $48.4\%$ to $25.5\%$ on a held-out Warsh
+        test split.
+\end{itemize}
+
+\begin{emeraldbox}[title=Key Contributions of the Tahkik Project]
+\begin{enumerate}
+  \item A cross-platform mobile application (Flutter) providing an
+        intuitive Quran reading and recitation recording experience with
+        the official KFGQPC Warsh font.
+  \item A real-time AI-driven recitation evaluation pipeline integrating
+        a fine-tuned Quranic ASR model with WebSocket streaming for
+        sub-second partial transcriptions.
+  \item A dedicated React/TypeScript dashboard empowering teachers to
+        review, correct, and certify (\textit{Ijaza}) student
+        recitations, with a complementary administrator workspace for
+        platform analytics and live AI/system telemetry.
+  \item A production-grade containerised inference server combining
+        Caddy, Go, and Python NeMo, deployable on a single DigitalOcean
+        droplet via a one-shot provisioning script.
+  \item A Madd Tajweed analyser implementing eight Warsh/Azraq rules
+        with auto-calibrated haraka length and CTC-derived per-letter
+        timings.
+  \item A reproducible Warsh dataset preparation pipeline (publicly
+        released on the Hugging Face Hub) and two fine-tuned Whisper
+        checkpoints (\texttt{tahkik-basic-warsh},
+        \texttt{tahkik-small-warsh}).
+  \item A documented Word Error Rate reduction from $48.4\%$ to $25.5\%$
+        through multi-reciter training and Warsh-aware text
+        normalisation.
+  \item A human-in-the-loop architecture combining AI efficiency with
+        irreplaceable teacher expertise.
+\end{enumerate}
+\end{emeraldbox}
+
+\section*{Limitations}
+
+Despite these achievements, certain limitations remain:
+\begin{itemize}
+  \item The AI model's accuracy varies across reciters outside the
+        training set and across regional accents.
+  \item The current implementation requires an internet connection for
+        AI processing (no on-device inference yet).
+  \item The gamification and social-interaction features are
+        intentionally limited in this first release.
+  \item The Madd analyser locks to the canonical \emph{qasr} (2-count)
+        wajh; multi-wajh grading is left as future work.
+  \item The dataset is concentrated on three male reciters; coverage of
+        female and child voices remains a gap.
+\end{itemize}
+
+\begin{goldbox}[title=Future Perspectives]
+\begin{itemize}
+  \item Continue fine-tuning the recognition engine on additional Warsh
+        reciters (women, children, regional accents) and progressively
+        on other riwayat (Hafs, Qaloon, ad-Duri).
+  \item Add offline AI inference using on-device, quantised model
+        variants for low-bandwidth environments.
+  \item Extend the Tajweed analyser beyond madd: idgham, ikhfa,
+        qalqala, ghunnah, and tafkhim/tarqiq detection.
+  \item Implement gamification features (badges, leaderboards, learning
+        paths) to increase learner engagement.
+  \item Integrate live tutoring sessions with built-in audio/video
+        between teachers and students, complementing the existing chat
+        and certification flows.
+  \item Move to a multi-region deployment with horizontal scaling,
+        Prometheus/Grafana observability, and automated blue/green
+        deployments via GitHub Actions.
+\end{itemize}
+\end{goldbox}
+
+\begin{emeraldbox}[title=Closing Statement]
+\begin{center}
+\large\itshape
+``Read! In the name of your Lord who created.''\\[6pt]
+\normalsize\normalfont\color{black} --- Surah Al-Alaq, Verse 1
+\end{center}
+\vspace{6pt}
+\normalsize
+The Tahkik platform represents a meaningful step forward in digital
+Islamic education. By harmonising the efficiency of AI with the
+irreplaceable expertise of human teachers, Tahkik aspires to make
+high-quality Tajweed instruction accessible to a global audience,
+preserving the oral tradition of the Quran for generations to come.
+\end{emeraldbox}

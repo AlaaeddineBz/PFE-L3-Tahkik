@@ -1,0 +1,331 @@
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 12: REQUEST LIFECYCLE
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Request Lifecycle}
+
+\section{End-to-End Request Flow}
+
+The following describes the complete lifecycle of a single audio-evaluation request, from client submission to response delivery.
+
+\phaseblock{Step 1 --- Client Submission}{The Flutter mobile application captures or selects an audio recording, optionally pairs it with the ayah text the user was asked to recite, and sends it as a \texttt{multipart/form-data} POST request to \texttt{https://<SITE\_HOST>/api/v1/evaluate}. The audio is attached under the \texttt{audio} form field; the reference (if any) under \texttt{reference\_text}.}
+
+\phaseblock{Step 2 --- Caddy TLS \& Routing}{Caddy terminates the TLS handshake, runs the CORS preflight if applicable, and matches the request against the \texttt{@api} path matcher. The request is reverse-proxied to \texttt{go-server:8080} on the internal compose network. The CORS \texttt{Access-Control-Allow-Origin} response header is set from \texttt{\$DASHBOARD\_ORIGIN}.}
+
+\phaseblock{Step 3 --- Go Server Validation}{The Go server parses the multipart form (enforcing the 50\,MB limit), extracts the \texttt{audio} field, validates the file extension against the whitelist, reads the binary data into memory through a limit-reader, and captures the optional \texttt{reference\_text}.}
+
+\phaseblock{Step 4 --- Inference Forwarding}{The Go server constructs a fresh \texttt{multipart/form-data} request containing both \texttt{audio} and \texttt{reference\_text} (when supplied), targets \texttt{\$INFERENCE\_SERVER\_URL/evaluate}, and attaches the \texttt{Authorization: Bearer \$HF\_TOKEN} header if available. The HTTP client uses a 5-minute timeout.}
+
+\phaseblock{Step 5 --- Backend Audio Processing}{The Python FastAPI handler receives the upload, writes it to a temp file under \texttt{/tmp}, and loads it via \texttt{librosa.load(sr=16000, mono=True)}. The audio array is clamped to the last 60 seconds.}
+
+\phaseblock{Step 6 --- Model Inference}{The array is passed to \texttt{model.transcribe(\dots)} under the global inference semaphore. When \texttt{reference\_text} is present, the call requests timestamps and hypotheses so per-word and per-character timings can be extracted.}
+
+\phaseblock{Step 7 --- Optional Madd Analysis}{The CTC head is run for forced alignment, the analyser computes per-rule errors, and the response payload is augmented with \texttt{errors[]} and \texttt{haraka\_ms}.}
+
+\phaseblock{Step 8 --- Response Assembly}{The temp file is deleted in a \texttt{finally} block. The JSON result is returned to the Go server, which wraps it in the standard \texttt{\{"status":"success","data":\{\dots\}\}} envelope and forwards it back through Caddy to the Flutter client.}
+
+\section{Concurrency Patterns}
+
+Different components employ distinct concurrency strategies, each chosen for the workload it sees:
+
+\begin{table}[H]
+  \centering
+  \caption{Concurrency mechanisms across components}
+  \label{tab:concurrency}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Component} & \textbf{Pattern} & \textbf{Rationale} \\
+    \midrule
+    Caddy           & Event loop (Go native) & High-throughput TLS reverse proxy \\
+    Go API server   & Goroutines           & Lightweight; one per request \\
+    Python REST     & Single Uvicorn worker & Backed by one model copy \\
+    Python WS       & \texttt{asyncio} tasks & Bounded by per-connection lock \\
+    NeMo inference  & \texttt{Semaphore(1)} & Single CPU/GPU shared resource \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 13: FAILURE HANDLING
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Failure Handling}
+
+\section{Error Categories and Responses}
+
+The server distinguishes several categories of failure, each returning a specific HTTP status code and error message:
+
+\begin{table}[H]
+  \centering
+  \caption{Failure modes and corresponding HTTP responses}
+  \label{tab:failure_modes}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{p{4cm}cp{6cm}}
+    \toprule
+    \textbf{Failure Mode} & \textbf{HTTP Status} & \textbf{Response Action} \\
+    \midrule
+    Missing \texttt{audio} field      & 400 & \texttt{"audio field required"} \\
+    Wrong HTTP method                 & 405 & \texttt{"method not allowed"} \\
+    Oversized upload                  & 400 & \texttt{"file too large"} \\
+    Unsupported audio format          & 400 & Reject with file extension info \\
+    Inference timeout (5\,min)        & 504 & Return timeout error \\
+    Backend (Python) returns 5xx      & 502 & Wrap and forward error \\
+    Caddy cannot reach Python (cold) & 502 & Generic gateway error \\
+    \texttt{HEALTH\_TOKEN} unset      & 503 & system-health endpoint fails closed \\
+    Wrong Bearer token                & 401 & system-health rejects \\
+    Internal Python exception         & 500 & Log + return generic message \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Error Response Format}
+
+All client-facing errors at the Go layer use a uniform envelope:
+
+\begin{lstlisting}[caption={Uniform error response}]
+{
+  "status":  "error",
+  "message": "<human-readable error description>"
+}
+\end{lstlisting}
+
+This matches the success envelope's shape (\texttt{\{"status": "success", "data": \{\dots\}\}}) so clients can use a single discriminator field to branch.
+
+\section{Resilience Mechanisms}
+
+\begin{emeraldbox}[title=Implemented Resilience Patterns]
+\begin{itemize}
+  \item \textbf{Per-task exception isolation}: Errors in a WebSocket partial-window task are caught, logged with full traceback, and discarded --- they cannot tear down the WebSocket connection.
+  \item \textbf{Temp-file cleanup}: The \texttt{/evaluate} handler deletes uploaded audio in a \texttt{finally} block regardless of whether inference succeeded or threw.
+  \item \textbf{Per-container healthchecks}: Each container has a \texttt{HEALTHCHECK} directive (Go uses the \texttt{healthcheck} sub-command of its own binary; Python uses an inline urllib probe; Caddy's image healthcheck is sufficient).
+  \item \textbf{\texttt{restart: unless-stopped}}: All three services restart automatically on crash unless explicitly stopped by an operator.
+  \item \textbf{Cached system-health snapshot}: The 5-second cache absorbs traffic spikes from the dashboard's poll loop without thrashing \texttt{/proc} or Docker.
+  \item \textbf{System-health WS keepalive}: The WebSocket sends \texttt{ping} frames and the server replies with \texttt{pong}; a missed pong tears down the connection and the dashboard reconnects.
+  \item \textbf{Reset/stop session control}: The WebSocket protocol exposes explicit \texttt{reset} and \texttt{stop} messages; both cancel in-flight tasks and \texttt{reset} bumps a generation counter so stale partials are discarded silently.
+\end{itemize}
+\end{emeraldbox}
+
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 14: LOGGING AND MONITORING
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Logging and Monitoring}
+
+\section{Logging Strategy}
+
+The server employs a layered logging approach with structured log entries at each tier:
+
+\begin{table}[H]
+  \centering
+  \caption{Logging implementation by component}
+  \label{tab:logging}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{lp{5.5cm}p{5cm}}
+    \toprule
+    \textbf{Component} & \textbf{Log Output} & \textbf{Captured} \\
+    \midrule
+    Caddy           & Container stdout (Docker JSON)  & Access log + cert events \\
+    Go server       & \texttt{log} package $\rightarrow$ stdout & Request lifecycle, errors, version banner \\
+    Python REST     & \texttt{print(\dots, flush=True)}        & Model loading, request timing \\
+    Python WS       & Same                                     & Connect/disconnect, partial/final emit, errors \\
+    Madd analyser   & \texttt{print(\dots, flush=True)}        & Word alignment, haraka calibration, span counts \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+All container logs are captured by Docker's \texttt{json-file} driver with 20\,MB rotation across 5 files (configured in \texttt{/etc/docker/daemon.json} by the provisioning script). Operators can tail any container with \texttt{docker compose logs -f <service>}.
+
+\section{Metrics Exposure}
+
+The Python container maintains lightweight in-process counters and rolling latency deques (200 samples each for partial and final paths). These are returned by \texttt{GET /health}:
+
+\begin{lstlisting}[language=Python, caption={Metrics snapshot returned by Python /health}]
+{
+  "inference": {
+    "requests_total":         123,
+    "requests_failed":        2,
+    "ws_connections_total":   45,
+    "ws_connections_active":  3,
+    "partial_p50_ms":         3450,
+    "partial_p95_ms":         7100,
+    "final_p50_ms":           8200,
+    "final_p95_ms":           14500,
+    "last_request_at":        "2026-...",
+    "last_error_at":          null,
+    "last_error":             null
+  }
+}
+\end{lstlisting}
+
+The Go server's \texttt{/api/v1/system-health} aggregator augments this with host metrics, container status, and version stamps for the operations dashboard.
+
+\section{Observability Roadmap}
+
+\begin{goldbox}[title=Proposed Observability Enhancements]
+\begin{itemize}
+  \item \textbf{Prometheus exposition}: Add a \texttt{/metrics} endpoint exporting the same in-process counters in Prometheus format for scraping by an external collector.
+  \item \textbf{Structured JSON logs}: Replace the current line-based logs with single-line JSON entries so log shippers (Vector, Fluent Bit) can index them.
+  \item \textbf{Request tracing}: Generate a unique trace ID at the Caddy layer and propagate through Go and Python logs to correlate per-request events.
+  \item \textbf{DigitalOcean alert policies}: External backstop for the in-dashboard alerts --- four threshold policies (CPU, memory, disk, droplet-down) documented in \texttt{docs/do-alerts-setup.md}.
+  \item \textbf{Centralized error reporting}: Forward Python tracebacks and Go panics to a Sentry or similar aggregator.
+\end{itemize}
+\end{goldbox}
+
+\section{Dashboard Integration}
+
+The Tahkik admin dashboard polls \texttt{/api/v1/system-health} every 5\,s for the snapshot view and opens a WebSocket to \texttt{/api/v1/system-health/ws} for the live metrics page. Both endpoints require the \texttt{HEALTH\_TOKEN}; the dashboard reads it from its own \texttt{VITE\_TAHKIK\_HEALTH\_TOKEN} environment variable and stores it only client-side (no propagation to third parties).
+
+% ═══════════════════════════════════════════════════════════════════════════════
+% CHAPTER 15: CONCLUSION
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Conclusion}
+
+\section{Summary}
+
+This report has documented the architecture, implementation, and operational concerns of the Tahkik inference server in its current NeMo-based form. The system delivers production-grade Arabic Quranic recitation transcription and Tajweed-rule analysis to the Flutter mobile application through a three-container Docker Compose stack: Caddy (TLS + routing), a Go API gateway (validation + system-health aggregation), and a Python FastAPI server hosting NVIDIA's FastConformer Hybrid CTC/RNNT model.
+
+\section{Key Achievements}
+
+\begin{infobox}[title=Project Highlights]
+\begin{itemize}
+  \item \textbf{Engine upgrade}: Successfully migrated from the legacy Whisper / CTranslate2 stack to NVIDIA NeMo FastConformer with no Flutter-side code change (only an \texttt{HF\_SPACE\_URL} swap).
+  \item \textbf{Quranic-domain accuracy}: 6.55\,\% WER on the EveryAyah benchmark on the same canonical checkpoint that drives the inference path.
+  \item \textbf{Real-time streaming}: \texttt{/ws/stream} delivers partial transcriptions on an 8-second sliding window with ${<}1$\,s p50 latency on a single T4 GPU.
+  \item \textbf{Madd-rule grading}: The analyser implements eight Warsh/Azraq madd rules with auto-calibrated haraka length and CTC-derived per-letter timings.
+  \item \textbf{One-command deploy}: \texttt{provision-droplet.sh} stands up a fresh production droplet end-to-end (Docker + TLS + model cache) in 10--15 minutes.
+  \item \textbf{Operator dashboard}: \texttt{/api/v1/system-health} surfaces host, container, and inference metrics under a Bearer-token-gated endpoint with a WebSocket variant for live updates.
+\end{itemize}
+\end{infobox}
+
+\section{Future Enhancements}
+
+\begin{goldbox}[title=Roadmap]
+\begin{itemize}
+  \item \textbf{Performance}
+    \begin{itemize}
+      \item Migrate to GPU droplets (T4/L4) as traffic warrants.
+      \item Quantise the NeMo checkpoint to INT8 for CPU inference (requires NVIDIA's quantisation tooling).
+      \item Batch concurrent inferences on GPU.
+    \end{itemize}
+  \item \textbf{Reliability}
+    \begin{itemize}
+      \item Add rate limiting at the Caddy layer.
+      \item Add a bounded request queue at the Go layer with explicit 503 responses.
+      \item Wire Sentry or equivalent for error aggregation.
+    \end{itemize}
+  \item \textbf{Tajweed analysis}
+    \begin{itemize}
+      \item Extend rules beyond madd: idgham, ikhfa, qalqala, ghunna detection.
+      \item Add tafkhim/tarqiq detection for the lam and ra letters.
+      \item Multi-wajh grading mode (accept 2 / 4 / 6 counts) for Badal, Aarid, Lin instead of locked qasr.
+    \end{itemize}
+  \item \textbf{Operations}
+    \begin{itemize}
+      \item Multi-region deployments behind a global load balancer.
+      \item Automated blue/green deploys via the GitHub Actions workflow.
+      \item Prometheus + Grafana stack for long-term metrics retention.
+    \end{itemize}
+\end{itemize}
+\end{goldbox}
+
+\section{Final Remarks}
+
+\begin{center}
+\begin{tikzpicture}
+  \node[
+    draw=teal!50!black,
+    fill=tealbg,
+    rounded corners=10pt,
+    inner sep=15pt,
+    text width=14cm,
+    align=center,
+    text=teal!60!black
+  ] {
+    \large\bfseries Production-Ready Inference Stack \\[6pt]
+    \normalsize
+    The Tahkik server stack runs reliably on a single-host Docker Compose deployment, \\
+    with a production CPU baseline at \texttt{s-4vcpu-8gb} and a GPU-overlay one-liner away. \\
+    The architecture cleanly separates TLS, REST routing, and ML inference, \\
+    making each layer independently upgradable.
+  };
+\end{tikzpicture}
+\end{center}
+
+% ═══════════════════════════════════════════════════════════════════════════════
+% REFERENCES
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter*{References}
+\addcontentsline{toc}{chapter}{References}
+
+\begin{thebibliography}{99}
+
+\bibitem{nemo}
+NVIDIA Corporation. \emph{NeMo: A Toolkit for Conversational AI}. \\
+\url{https://github.com/NVIDIA/NeMo}
+
+\bibitem{fastconformer}
+Rekesh, D., Koluguri, N. R., \emph{et al.} (2023). \emph{Fast Conformer with Linearly Scalable Attention for Efficient Speech Recognition}. ASRU 2023. \\
+\url{https://arxiv.org/abs/2305.05084}
+
+\bibitem{nemoarabic}
+NVIDIA. \emph{stt\_ar\_fastconformer\_hybrid\_large\_pcd\_v1.0 model card}. \\
+\url{https://huggingface.co/nvidia/stt_ar_fastconformer_hybrid_large_pcd_v1.0}
+
+\bibitem{rnnt}
+Graves, A. (2012). \emph{Sequence Transduction with Recurrent Neural Networks}. ICML 2012 Representation Learning Workshop. \\
+\url{https://arxiv.org/abs/1211.3711}
+
+\bibitem{ctc}
+Graves, A., Fern\'andez, S., Gomez, F., Schmidhuber, J. (2006). \emph{Connectionist Temporal Classification: Labelling Unsegmented Sequence Data with Recurrent Neural Networks}. ICML 2006.
+
+\bibitem{torchaudio_align}
+PyTorch Team. \emph{Forced Alignment with Wav2Vec2 / CTC --- \texttt{torchaudio.functional.forced\_align}}. \\
+\url{https://pytorch.org/audio/stable/generated/torchaudio.functional.forced_align.html}
+
+\bibitem{fastapi}
+Ram\'irez, S. \emph{FastAPI: Modern, fast (high-performance) web framework}. \\
+\url{https://fastapi.tiangolo.com}
+
+\bibitem{uvicorn}
+Christie, T. \emph{Uvicorn --- The lightning-fast ASGI server}. \\
+\url{https://www.uvicorn.org}
+
+\bibitem{caddy}
+Matt Holt et al. \emph{Caddy --- The Ultimate Server with Automatic HTTPS}. \\
+\url{https://caddyserver.com}
+
+\bibitem{gohttp}
+The Go Authors. \emph{Package net/http}. \\
+\url{https://pkg.go.dev/net/http}
+
+\bibitem{coderws}
+Coder. \emph{github.com/coder/websocket --- minimal and idiomatic WebSocket library for Go}. \\
+\url{https://github.com/coder/websocket}
+
+\bibitem{docker}
+Docker, Inc. \emph{Docker Engine documentation}. \\
+\url{https://docs.docker.com/engine/}
+
+\bibitem{compose}
+Docker, Inc. \emph{Docker Compose specification}. \\
+\url{https://docs.docker.com/compose/}
+
+\bibitem{librosa}
+McFee, B. \emph{librosa: Audio and music signal analysis in Python}. \\
+\url{https://librosa.org}
+
+\bibitem{warsh}
+\emph{Tariq al-Azraq (Warsh `an Nafi' transmission)} --- riwaya documentation in the Tajweed literature. Standard reference works on Madinah Mushaf and Tariq Azraq variants.
+
+\bibitem{tahkikserver}
+Ben Hadj Mohamed. \emph{Tahkik Server Source Code Repository}. \\
+\url{https://github.com/mohamedbenhadjer/tahkik-server}
+
+\bibitem{everyayah}
+EveryAyah. \emph{Quranic Audio Dataset}. \\
+\url{https://everyayah.com}
+
+\end{thebibliography}
+
+\vfill
+\begin{center}
+\textcolor{slategray}{\itshape End of Report}
+\end{center}

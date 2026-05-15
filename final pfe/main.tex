@@ -1,0 +1,87 @@
+% ════════════════════════════════════════════════════════════════════════════
+%  Tahkik --- Final PFE Report (Combined Edition)
+%
+%  This master file produces a single PDF that consolidates the three reports
+%  authored for the project:
+%
+%     Part I   Tahkik Mobile and Web Platform
+%              (sources: tahkik_pfe/*.tex)
+%
+%     Part II  Tahkik Inference Server --- Technical Report
+%              (sources: server_report.tex + server_report_part2.tex
+%                        + server_report_part3.tex + server_report_part4.tex)
+%
+%     Part III AI-Powered Quranic Recitation Analysis
+%              Whisper Fine-Tuning for Warsh Recitation
+%              (sources: model train.tex)
+%
+%  Compile from inside the "final pfe" folder with:
+%     pdflatex -interaction=nonstopmode main.tex
+%     pdflatex -interaction=nonstopmode main.tex   (twice for cross-refs)
+%
+%  Authors:    Benhadjer Mohamed, Bouziani Alaa Eddine
+%  Supervisor: Mme. Meriem Ali Khoudja
+%  University: Yahia Fares University of Medea, 2025/2026
+% ════════════════════════════════════════════════════════════════════════════
+
+\documentclass[12pt,a4paper,openany]{report}
+
+\input{preamble}
+
+\begin{document}
+
+% ─── COVER PAGE ─────────────────────────────────────────────────────────────
+\input{front/cover}
+
+% ─── FRONT MATTER ───────────────────────────────────────────────────────────
+\pagenumbering{roman}
+\input{front/dedication}
+\input{front/acknowledgements}
+\input{front/abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  PART I --- TAHKIK MOBILE AND WEB PLATFORM
+% ════════════════════════════════════════════════════════════════════════════
+\part{Tahkik Mobile and Web Platform}
+
+\input{chapters_main/general_introduction}
+\input{chapters_main/chapter1_state_of_art}
+\input{chapters_main/chapter2_conceptual_study}
+\input{chapters_main/chapter3_implementation}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  PART II --- TAHKIK INFERENCE SERVER (TECHNICAL REPORT)
+% ════════════════════════════════════════════════════════════════════════════
+\part{Tahkik Inference Server --- Technical Report}
+
+\input{chapters_server/server_part1}
+\input{chapters_server/server_part2}
+\input{chapters_server/server_part3}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  PART III --- AI-POWERED QURANIC RECITATION ANALYSIS
+%               (WHISPER FINE-TUNING FOR WARSH RECITATION)
+% ════════════════════════════════════════════════════════════════════════════
+\part{AI-Powered Quranic Recitation Analysis}
+
+\input{chapters_model/model_body}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  GENERAL CONCLUSION OF THE COMBINED REPORT
+% ════════════════════════════════════════════════════════════════════════════
+\input{chapters_main/general_conclusion_combined}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  BACK MATTER
+% ════════════════════════════════════════════════════════════════════════════
+\input{back/bibliography}
+
+\end{document}
