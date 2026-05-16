@@ -1,0 +1,98 @@
+% ════════════════════════════════════════════════════════════════════════════
+%  APPENDIX B --- WHISPER-SMALL FINE-TUNING FOR WARSH
+%  Short summary of the training work in ~/project-L3.
+% ════════════════════════════════════════════════════════════════════════════
+\chapter{Whisper-Small Fine-Tuning for Warsh}
+\label{app:training}
+
+We trained \texttt{benhadjermed/tahkik-small-warsh} by fine-tuning
+\texttt{openai/whisper-small} on the pre-processed Warsh dataset
+\texttt{benhadjermed/warsh\_quran\_aligned\_processed} (three reciters,
+${\sim}13{,}000$ aligned ayah segments). The dataset was assembled by
+the preparation notebooks in \texttt{project-L3/} (\texttt{tahkik\_01\_prepare\_dataset.ipynb}
+plus the \texttt{tahkik\_dataset\_v2\_*} series for download,
+normalisation, and feature extraction). Training itself runs in
+\texttt{tahkik\_small\_warsh\_train.ipynb} on Google Colab Pro
+(NVIDIA T4 / A100), with checkpoints saved every 250 steps to Google
+Drive so a disconnected session can be resumed transparently. The
+resulting checkpoint is published to the Hugging Face Hub and consumed
+by the inference server documented in Appendix~\ref{app:server}.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+    every node/.style={font=\footnotesize},
+    stage/.style={draw, rounded corners, minimum width=2.4cm, minimum height=1.2cm,
+                  align=center, fill=tealbg, text width=2.4cm},
+    arrow/.style={->, thick, teal!80!black, >=latex}
+  ]
+    \node[stage] (audio)   {Raw\\Audio + Text};
+    \node[stage, right=0.6cm of audio]    (prep)  {Pre-processing\\(resample,\\strip diacritics)};
+    \node[stage, right=0.6cm of prep]     (align) {Alignment\\(RapidFuzz)};
+    \node[stage, right=0.6cm of align]    (qa)    {Quality\\Assurance};
+    \node[stage, right=0.6cm of qa]       (split) {Train / Test\\Split};
+    \node[stage, below=0.7cm of split]    (train) {Fine-Tune\\Whisper-Small};
+    \node[stage, left=0.6cm of train]     (eval)  {Evaluation\\(WER, loss)};
+    \node[stage, left=0.6cm of eval]      (deploy){Deploy\\(HF Hub)};
+
+    \draw[arrow] (audio) -- (prep);
+    \draw[arrow] (prep)  -- (align);
+    \draw[arrow] (align) -- (qa);
+    \draw[arrow] (qa)    -- (split);
+    \draw[arrow] (split) -- (train);
+    \draw[arrow] (train) -- (eval);
+    \draw[arrow] (eval)  -- (deploy);
+  \end{tikzpicture}
+  \caption{Training pipeline followed in \texttt{project-L3/}: raw audio-text
+  pairs are aligned, quality-checked, split, then used to fine-tune Whisper-Small
+  and publish the checkpoint to the Hugging Face Hub.}
+  \label{fig:app_training_arch}
+\end{figure}
+
+\section{Configuration}
+\label{sec:app_training_config}
+
+\begin{table}[H]
+  \centering
+  \caption{Hyper-parameters used to fine-tune \texttt{tahkik-small-warsh}
+  (\texttt{tahkik\_small\_warsh\_train.ipynb}, Cell 1).}
+  \label{tab:app_training_hp}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Hyper-parameter} & \textbf{Value} \\
+    \midrule
+    Base model                & \texttt{openai/whisper-small} \\
+    Dataset                   & \texttt{benhadjermed/warsh\_quran\_aligned\_processed} \\
+    Max steps                 & $3{,}000$ \\
+    Per-device batch size     & $4$ \\
+    Gradient accumulation     & $8$ \quad (effective batch $32$) \\
+    Learning rate             & $1\times 10^{-5}$ \\
+    Optimiser                 & AdamW, weight decay $0.01$ \\
+    Warm-up steps             & $200$ \\
+    Eval / save frequency     & every $250$ steps \\
+    Mixed precision           & FP16 \\
+    Best-checkpoint criterion & \texttt{load\_best\_model\_at\_end} on \texttt{eval\_wer} \\
+    Generation max length     & $225$ tokens (greedy decoding) \\
+    Checkpoint persistence    & Google Drive (\texttt{CHECKPOINT\_DIR}) \\
+    Publication target        & \texttt{benhadjermed/tahkik-small-warsh} on HF Hub \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Dataset and result}
+\label{sec:app_training_result}
+
+\begin{itemize}
+  \item \textbf{Dataset:} \texttt{benhadjermed/warsh\_quran\_aligned\_processed}
+        --- Warsh recitations from three reciters, audio resampled to
+        16\,kHz mono, text normalised with Warsh-specific orthographic
+        fixes, log-Mel features pre-computed and labels tokenised so
+        the training notebook does no heavy preprocessing.
+  \item \textbf{Outcome:} the multi-reciter training run reduces the
+        validation Word Error Rate from $34.62\%$ down to $25.52\%$ on
+        the held-out Warsh test split, lowest at the step-3{,}000
+        checkpoint. That checkpoint is the one published to the Hub as
+        \texttt{benhadjermed/tahkik-small-warsh} and loaded by the
+        inference server.
+\end{itemize}

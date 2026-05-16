@@ -1,0 +1,37 @@
+% ════════════════════════════════════════════════════════════════════════════
+%  GENERAL INTRODUCTION
+% ════════════════════════════════════════════════════════════════════════════
+\chapter*{General Introduction}
+\addcontentsline{toc}{chapter}{General Introduction}
+\label{ch:general_intro}
+
+% ── Context ──
+The recitation of the Holy Quran holds a central place in Islamic practice and spirituality. For over fourteen centuries, the science of Tajweed --- the set of rules governing the correct pronunciation of Quranic verses --- has been transmitted orally from qualified scholars to students through direct, face-to-face instruction. This traditional method, known as \textit{Talaqqi} and \textit{Mushafahah}, remains the gold standard for learning proper recitation.
+
+In recent years, the rapid advancement of Artificial Intelligence (AI), particularly in the fields of Automatic Speech Recognition (ASR) and Natural Language Processing (NLP), has opened new possibilities for educational technology. Models such as OpenAI's Whisper have demonstrated remarkable capabilities in transcribing and understanding spoken language across multiple languages, including Arabic. These technological breakthroughs present a unique opportunity to develop intelligent tools that can assist learners in perfecting their Quranic recitation.
+
+% ── Problematic ──
+\begin{warnbox}[title=Problem Statement]
+Despite the abundance of digital Quranic resources, most existing applications function merely as digital copies of the Mushaf or provide pre-recorded recitations for passive listening. Very few platforms offer interactive, real-time feedback on a user's own recitation quality. The shortage of qualified Tajweed teachers, especially for non-Arabic speakers and those in remote areas, further limits access to personalized instruction. Furthermore, no existing platform effectively combines AI-driven instant feedback with a structured teacher review system, leaving a significant gap in the Quranic e-learning ecosystem.
+\end{warnbox}
+
+% ── Objectives ──
+The main objectives of this project are:
+\begin{enumerate}
+  \item To develop a cross-platform mobile application (using Flutter) that enables users to read the Quran and record their recitation for AI-based evaluation.
+  \item To integrate an AI-powered speech recognition engine (Whisper fine-tuned on Warsh recitation for the training pipeline; NVIDIA NeMo FastConformer in production) for real-time pronunciation analysis and Tajweed error detection.
+  \item To build a web-based administration and teacher dashboard (using React) for managing students, reviewing recitations, and providing manual feedback.
+  \item To create a comprehensive learning ecosystem with progress tracking, practice sessions, and subscription management.
+\end{enumerate}
+
+% ── Methodology ──
+To achieve these objectives, we adopted an Agile-inspired development methodology, working in iterative sprints with continuous review and improvement. The system architecture follows a client-server model, with the Flutter mobile app and React web dashboard communicating with a Supabase backend for authentication, database operations, and real-time capabilities, while a dedicated Python server handles AI inference.
+
+% ── Document Organization ──
+This document is organized as follows:
+
+\begin{itemize}
+  \item \textbf{Chapter~\ref{ch:state_of_art} --- State of the Art}: Presents the domain of Quranic recitation and Tajweed, reviews existing digital solutions, and identifies the gap that Tahkik addresses.
+  \item \textbf{Chapter~\ref{ch:conceptual} --- Conceptual Study}: Details the functional and non-functional requirements and presents the system design through UML diagrams (Use Case, Sequence, Class, and Architecture diagrams).
+  \item \textbf{Chapter~\ref{ch:implementation} --- Implementation and Realization}: Describes the development environment, technology stack, database design, and showcases the application's user interfaces.
+\end{itemize}

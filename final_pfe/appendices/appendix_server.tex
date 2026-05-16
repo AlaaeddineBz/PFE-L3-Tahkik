@@ -1,0 +1,143 @@
+% ════════════════════════════════════════════════════════════════════════════
+%  APPENDIX A --- TAHKIK INFERENCE SERVER
+%  Short summary of the production stack in ~/tahkik-server.
+% ════════════════════════════════════════════════════════════════════════════
+\chapter{Tahkik Inference Server}
+\label{app:server}
+
+The Tahkik backend is a three-container Docker Compose stack deployed on a
+single DigitalOcean droplet (provisioned by \texttt{scripts/provision-droplet.sh}):
+\textbf{Caddy} terminates TLS and routes traffic, a \textbf{Go} API
+gateway on port \texttt{8080} handles REST traffic, and a \textbf{Python
+FastAPI} service on port \texttt{7860} hosts three AI models and exposes
+the streaming endpoint. The Flutter client talks to the public hostname
+and consumes three endpoints: \texttt{POST /api/v1/evaluate} (batch
+audio upload), \texttt{WS /ws/stream} (real-time partial transcription),
+and \texttt{GET /api/v1/system-health} (host metrics and inference
+latency).
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  component/.style={
+    draw=teal!60!black, rounded corners=8pt, minimum width=3.2cm,
+    minimum height=1.6cm, fill=tealbg, font=\small\bfseries,
+    text=teal!80!black, align=center
+  },
+  arrow/.style={-latex, thick, teal!60!black},
+  label/.style={font=\scriptsize, color=slategray}
+]
+\node[component] (client)  at (0,    0)  {Flutter\\Mobile Client};
+\node[component] (caddy)   at (4,    0)  {Caddy\\(:80 / :443)};
+\node[component] (go)      at (8,    1.2){Go API\\(:8080)};
+\node[component] (py)      at (8,   -1.2){Python FastAPI\\(:7860)};
+\node[component] (models)  at (12,  -1.2){3 AI models\\(see below)};
+
+\draw[arrow] (client) -- node[label, above] {HTTPS / WSS} (caddy);
+\draw[arrow] (caddy)  -- node[label, above] {/api/v1/* /health} (go);
+\draw[arrow] (caddy)  -- node[label, below] {/ws/*} (py);
+\draw[arrow] (go)     -- node[label, right] {/evaluate} (py);
+\draw[arrow] (py)     -- node[label, above] {inference} (models);
+\end{tikzpicture}
+\caption{Production stack: Caddy reverse proxy, Go API gateway, and Python
+FastAPI service hosting the three inference models.}
+\label{fig:app_server_arch}
+\end{figure}
+
+\section{The three models}
+\label{sec:app_server_models}
+
+The Python service loads three complementary models. Each one is
+responsible for a distinct slice of the recitation analysis; the
+combined output is merged into a single JSON response.
+
+\begin{itemize}
+  \item \textbf{\texttt{benhadjermed/tahkik-small-warsh}} --- our
+        Whisper-Small Warsh fine-tune (Appendix~\ref{app:training}).
+        \emph{Role:} detects \textbf{wrong words} and wrong
+        \textbf{tashkeel} (diacritics) in the reciter's transcription
+        against the expected ayah text.
+  \item \textbf{\texttt{nvidia/stt\_ar\_fastconformer\_hybrid\_large\_pcd\_v1.0}}
+        --- NVIDIA NeMo FastConformer Hybrid CTC/RNNT for Arabic.
+        \emph{Role:} the RNNT head provides high-accuracy transcription
+        and word/character timestamps; the CTC head is reused for forced
+        alignment against the reference text so each letter receives a
+        real start/end time.
+  \item \textbf{\texttt{obadx/muaalem-model-v3\_2}} --- multi-level CTC
+        phonetic model. \emph{Role:} per-letter Tajweed grading. Its
+        per-frame predictions feed the rules engine
+        (\texttt{python/hf\_space/rules/}) which checks madd duration,
+        intrinsic sifat, qalqala, ghunna, and tafkheem.
+\end{itemize}
+
+\section{Ahkam (Tajweed rules) graded}
+\label{sec:app_server_ahkam}
+
+Table~\ref{tab:app_ahkam} lists every family of rules that the rules
+engine currently checks. The corresponding source modules live under
+\texttt{tahkik-server/python/hf\_space/rules/}.
+
+\begin{longtable}{p{2.6cm} p{4.2cm} p{7.4cm}}
+\caption{Ahkam graded by the rules engine in \texttt{python/hf\_space/rules/}.}
+\label{tab:app_ahkam} \\
+\toprule
+\textbf{Family} & \textbf{Sub-rule} & \textbf{What is checked} \\
+\midrule
+\endfirsthead
+\multicolumn{3}{c}{\textit{(continued)}} \\
+\toprule
+\textbf{Family} & \textbf{Sub-rule} & \textbf{What is checked} \\
+\midrule
+\endhead
+
+\multirow{8}{*}{\textbf{Madd}}
+  & \texttt{tabii}            & Natural madd, 2 counts (window 1.5--2.7). \\
+  & \texttt{badal}            & Hamza precedes madd letter, qasr 2 counts. \\
+  & \texttt{muttasil}         & Madd + hamza in the same word, 6 counts (window 5.0--7.5). \\
+  & \texttt{munfasil}         & Madd at word end + hamza on the next word, 6 counts. \\
+  & \texttt{lazim\_muthaqqal} & Madd followed by a shaddah, 6 counts. \\
+  & \texttt{lazim\_mukhaffaf} & Madd followed by a permanent sukun, 6 counts. \\
+  & \texttt{aarid}            & Word-final madd at waqf, qasr 2 counts. \\
+  & \texttt{lin}              & Lin letter (waw/ya sakin after fatha) at waqf, 2 counts. \\
+\midrule
+\multirow{3}{*}{\textbf{Ghunna}}
+  & Ikhfa                     & Nun sakin / tanwin followed by an ikhfa letter --- partial nasalisation held $\sim$2 counts. \\
+  & Idgham (with ghunna)      & Nun sakin / tanwin merged into the next letter with full nasalisation. \\
+  & Iqlab                     & Nun sakin / tanwin followed by \emph{ba} converts to a \emph{mim}-coloured ghunna. \\
+\midrule
+\multirow{2}{*}{\textbf{Qalqala}}
+  & Sughra (minor)            & Sukun on a qalqala letter (\emph{qaf, taa, baa, jim, dal}) inside a word --- light echo. \\
+  & Kubra (major)             & Qalqala letter at waqf --- stronger, more pronounced echo. \\
+\midrule
+\multirow{3}{*}{\textbf{Tafkheem}}
+  & Isti'l\=a letters         & The seven heavy letters (\emph{kha, sad, dad, ghain, taa, qaf, dha}) always pronounced thick. \\
+  & Conditional \emph{ra}     & Tafkheem / tarqiq on \emph{ra} decided by surrounding haraka and sukun. \\
+  & Laf\.z al-Jal\=ala        & Heavy \emph{lam} of \emph{All\=ah} after fatha/damma, light after kasra. \\
+\midrule
+\multirow{7}{*}{\textbf{Intrinsic sifat}}
+  & Hams / Jahr               & Voiceless vs.\ voiced articulation per letter. \\
+  & Shidda / Rakhawa          & Stop vs.\ continuant. \\
+  & Safeer                    & Whistled articulation on \emph{sad, zay, sin}. \\
+  & Tafashie                  & Air spread on \emph{shin}. \\
+  & Istitala                  & Tongue extension on \emph{dad}. \\
+  & Itbaq                     & Mouth closure on \emph{sad, dad, taa, dha}. \\
+  & Tikraar                   & Trill control on \emph{ra}. \\
+\bottomrule
+\end{longtable}
+
+\section{Request flow}
+\label{sec:app_server_flow}
+
+A client uploads an audio clip and (optionally) the ayah text it
+expected the reciter to say. The Go gateway streams the file to the
+Python service, which runs FastConformer for transcription and
+CTC-aligned timestamps, then asks the muaalem grader for per-letter
+phoneme predictions. The rules engine walks the reference text,
+generates one expected letter per base character, compares it against
+the muaalem output, and emits a \texttt{TajweedError} for each
+mismatch. The response contains the transcription, a confidence score,
+the list of errors with millisecond ranges, and the calibrated
+\texttt{haraka\_ms} used for grading. Waqf positions are derived from
+acoustic silence (${\geq}\,300$\,ms) rather than from ayah boundaries,
+so \texttt{aarid} and \texttt{lin} are graded only where the reciter
+actually paused.

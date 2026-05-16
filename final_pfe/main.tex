@@ -1,0 +1,76 @@
+% ════════════════════════════════════════════════════════════════════════════
+%  Tahkik --- Final PFE Report
+%
+%  This master file produces the PDF for the Tahkik mobile and web platform
+%  report. The inference server and the Whisper fine-tuning work are
+%  summarised in two short appendices at the end of the document:
+%
+%     Main body    Tahkik Mobile and Web Platform
+%                  (sources: chapters_main/*.tex)
+%
+%     Appendix A   Tahkik Inference Server
+%                  (sources: appendices/appendix_server.tex)
+%
+%     Appendix B   Whisper-Small Fine-Tuning for Warsh
+%                  (sources: appendices/appendix_training.tex)
+%
+%  Compile from inside the "final pfe" folder with:
+%     pdflatex -interaction=nonstopmode main.tex
+%     pdflatex -interaction=nonstopmode main.tex   (twice for cross-refs)
+%
+%  Authors:    Benhadjer Mohamed, Bouziani Alaa Eddine
+%  Supervisor: Mme. Meriem Ali Khoudja
+%  University: Yahia Fares University of Medea, 2025/2026
+% ════════════════════════════════════════════════════════════════════════════
+
+\documentclass[12pt,a4paper,openany]{report}
+
+\input{preamble}
+
+\begin{document}
+
+% ─── COVER PAGE ─────────────────────────────────────────────────────────────
+\input{front/cover}
+
+% ─── FRONT MATTER ───────────────────────────────────────────────────────────
+\pagenumbering{roman}
+\input{front/dedication}
+\input{front/acknowledgements}
+\input{front/abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  PART I --- TAHKIK MOBILE AND WEB PLATFORM
+% ════════════════════════════════════════════════════════════════════════════
+\part{Tahkik Mobile and Web Platform}
+
+\input{chapters_main/general_introduction}
+\input{chapters_main/chapter1_state_of_art}
+\input{chapters_main/chapter2_conceptual_study}
+\input{chapters_main/chapter3_implementation}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  GENERAL CONCLUSION
+% ════════════════════════════════════════════════════════════════════════════
+\input{chapters_main/general_conclusion_combined}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  APPENDICES --- Inference Server + Model Training (short summaries)
+% ════════════════════════════════════════════════════════════════════════════
+\appendix
+\input{appendices/appendix_server}
+\input{appendices/appendix_training}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  BACK MATTER
+% ════════════════════════════════════════════════════════════════════════════
+\input{back/bibliography}
+
+\end{document}

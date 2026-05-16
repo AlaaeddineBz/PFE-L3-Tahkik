@@ -1,0 +1,79 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+\section*{Abstract}
+Our final study project, \textbf{Tahkik}, is a mobile and web platform
+dedicated to Quran recitation and Tajweed learning, powered by Artificial
+Intelligence. The platform aims to bridge the gap between traditional
+Quranic education and modern technology by providing learners with instant
+AI-driven feedback on their recitation, while empowering teachers with a
+comprehensive dashboard to review and manage student progress.
+
+The mobile application, built with Flutter, allows users to read the Quran
+in the Warsh script, record their recitation, and receive real-time
+pronunciation analysis. The web dashboard, developed with React and
+TypeScript on top of Supabase, provides teachers and administrators with
+tools for recitation review, student management, certificate (Ijaza)
+issuance, subscription management, and live AI/system telemetry.
+
+Behind the application, a containerised inference stack --- a Caddy
+reverse proxy, a Go API gateway, and a Python FastAPI server hosting an
+NVIDIA NeMo \textit{FastConformer Hybrid CTC/RNNT} model --- delivers
+batch and streaming Arabic speech recognition. A Tajweed (madd) analyser
+running on top of the CTC head grades the recitation against the
+Warsh~`an~Naf{\^\i}' canonical text. To specialise the recognition engine
+on the Warsh riwaya, we built a 13{,}024-verse three-reciter dataset
+and fine-tuned a Whisper checkpoint, reducing the Word Error Rate from
+$48.4\%$ to $25.5\%$ on a held-out Warsh test split.
+
+This combined report consolidates: (1)~the main dissertation that
+describes the platform's mobile and web layers, (2)~the technical report
+that documents the inference server architecture, API contracts, and
+deployment, and (3)~the companion AI/ML report that describes the dataset
+preparation pipeline, the quality-assurance loop, the fine-tuning runs,
+and the WER analysis.
+
+\textbf{Keywords:} Quran, Tajweed, Warsh, AI, Speech Recognition, Whisper,
+NeMo FastConformer, Flutter, React, Go, FastAPI, Supabase, Mobile
+Application, E-Learning, WebSocket Streaming, Fine-Tuning.
+
+\vspace{0.8cm}
+
+\section*{R\'esum\'e}
+Notre projet de fin d'\'etudes, \textbf{Tahkik}, est une plateforme
+mobile et web d\'edi\'ee \`a l'apprentissage de la r\'ecitation du Coran
+et du Tajweed, aliment\'ee par l'Intelligence Artificielle. La plateforme
+vise \`a combler le foss\'e entre l'\'education coranique traditionnelle
+et la technologie moderne en fournissant aux apprenants un retour
+instantan\'e g\'en\'er\'e par l'IA sur leur r\'ecitation, tout en offrant
+aux enseignants un tableau de bord complet pour examiner et g\'erer les
+progr\`es des \'etudiants.
+
+L'application mobile, d\'evelopp\'ee avec Flutter, permet aux utilisateurs
+de lire le Coran en \'ecriture Warsh, d'enregistrer leur r\'ecitation et
+de recevoir une analyse de prononciation en temps r\'eel. Le tableau de
+bord web, d\'evelopp\'e avec React et TypeScript par-dessus Supabase,
+fournit aux enseignants et aux administrateurs des outils de gestion.
+
+Derri\`ere l'application, une pile d'inf\'erence containeris\'ee
+(Caddy + serveur Go + serveur Python FastAPI h\'ebergeant un mod\`ele
+NVIDIA NeMo \textit{FastConformer Hybride CTC/RNNT}) assure la
+reconnaissance vocale arabe en mode batch et en streaming. Un analyseur
+de Tajweed (madd) bas\'e sur l'alignement forc\'e CTC \'evalue la
+r\'ecitation par rapport au texte canonique de Warsh~`an~Naf{\^\i}'.
+Pour sp\'ecialiser le moteur de reconnaissance sur la riwaya Warsh, nous
+avons construit un jeu de donn\'ees de 13{\,}024 versets et trois
+r\'ecitateurs et affin\'e un mod\`ele Whisper, r\'eduisant le taux
+d'erreur de mots (WER) de $48{,}4\%$ \`a $25{,}5\%$.
+
+Ce rapport combin\'e regroupe: (1)~le m\'emoire principal d\'ecrivant
+les couches mobile et web, (2)~le rapport technique du serveur
+d'inf\'erence, et (3)~le rapport compl\'ementaire d'IA d\'ecrivant la
+pr\'eparation des donn\'ees, l'assurance qualit\'e, les entra{\^\i}nements
+et l'analyse des r\'esultats.
+
+\textbf{Mots-cl\'es:} Coran, Tajweed, Warsh, IA, Reconnaissance Vocale,
+Whisper, NeMo FastConformer, Flutter, React, Go, FastAPI, Supabase,
+Application Mobile, E-Learning, Streaming WebSocket, Affinage.
+
+\newpage
