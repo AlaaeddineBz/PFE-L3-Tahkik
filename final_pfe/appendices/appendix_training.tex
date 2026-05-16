@@ -15,8 +15,8 @@ normalisation, and feature extraction). Training itself runs in
 \texttt{tahkik\_small\_warsh\_train.ipynb} on Google Colab Pro
 (NVIDIA T4 / A100), with checkpoints saved every 250 steps to Google
 Drive so a disconnected session can be resumed transparently. The
-resulting checkpoint is published to the Hugging Face Hub and consumed
-by the inference server documented in Appendix~\ref{app:server}.
+resulting checkpoint is published to our private model registry and
+consumed by the inference server documented in Appendix~\ref{app:server}.
 
 \begin{figure}[H]
   \centering
@@ -33,7 +33,7 @@ by the inference server documented in Appendix~\ref{app:server}.
     \node[stage, right=0.6cm of qa]       (split) {Train / Test\\Split};
     \node[stage, below=0.7cm of split]    (train) {Fine-Tune\\Whisper-Small};
     \node[stage, left=0.6cm of train]     (eval)  {Evaluation\\(WER, loss)};
-    \node[stage, left=0.6cm of eval]      (deploy){Deploy\\(HF Hub)};
+    \node[stage, left=0.6cm of eval]      (deploy){Deploy\\(Registry)};
 
     \draw[arrow] (audio) -- (prep);
     \draw[arrow] (prep)  -- (align);
@@ -45,7 +45,7 @@ by the inference server documented in Appendix~\ref{app:server}.
   \end{tikzpicture}
   \caption{Training pipeline followed in \texttt{project-L3/}: raw audio-text
   pairs are aligned, quality-checked, split, then used to fine-tune Whisper-Small
-  and publish the checkpoint to the Hugging Face Hub.}
+  and publish the checkpoint to our private model registry.}
   \label{fig:app_training_arch}
 \end{figure}
 
@@ -75,7 +75,7 @@ by the inference server documented in Appendix~\ref{app:server}.
     Best-checkpoint criterion & \texttt{load\_best\_model\_at\_end} on \texttt{eval\_wer} \\
     Generation max length     & $225$ tokens (greedy decoding) \\
     Checkpoint persistence    & Google Drive (\texttt{CHECKPOINT\_DIR}) \\
-    Publication target        & \texttt{benhadjermed/tahkik-small-warsh} on HF Hub \\
+    Publication target        & \texttt{benhadjermed/tahkik-small-warsh} (private registry) \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -90,9 +90,9 @@ by the inference server documented in Appendix~\ref{app:server}.
         fixes, log-Mel features pre-computed and labels tokenised so
         the training notebook does no heavy preprocessing.
   \item \textbf{Outcome:} the multi-reciter training run reduces the
-        validation Word Error Rate from $34.62\%$ down to $25.52\%$ on
-        the held-out Warsh test split, lowest at the step-3{,}000
-        checkpoint. That checkpoint is the one published to the Hub as
-        \texttt{benhadjermed/tahkik-small-warsh} and loaded by the
-        inference server.
+        validation Word Error Rate from $34.62\%$ down to
+        $\mathbf{6.00\%}$ on the held-out Warsh test split, lowest at
+        the step-3{,}000 checkpoint. That checkpoint is the one
+        published as \texttt{benhadjermed/tahkik-small-warsh} and
+        loaded by the inference server.
 \end{itemize}

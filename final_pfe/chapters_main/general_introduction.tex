@@ -19,7 +19,7 @@ Despite the abundance of digital Quranic resources, most existing applications f
 The main objectives of this project are:
 \begin{enumerate}
   \item To develop a cross-platform mobile application (using Flutter) that enables users to read the Quran and record their recitation for AI-based evaluation.
-  \item To integrate an AI-powered speech recognition engine (Whisper fine-tuned on Warsh recitation for the training pipeline; NVIDIA NeMo FastConformer in production) for real-time pronunciation analysis and Tajweed error detection.
+  \item To integrate an AI-powered recitation analysis pipeline that combines three complementary models --- our own \texttt{tahkik-small-warsh} (Whisper-Small fine-tuned on Warsh recitation) for wrong-word and tashkeel detection, an NVIDIA NeMo FastConformer for transcription and CTC alignment, and the Muaalem model for per-letter Tajweed grading --- to deliver real-time pronunciation analysis and Tajweed error detection.
   \item To build a web-based administration and teacher dashboard (using React) for managing students, reviewing recitations, and providing manual feedback.
   \item To create a comprehensive learning ecosystem with progress tracking, practice sessions, and subscription management.
 \end{enumerate}

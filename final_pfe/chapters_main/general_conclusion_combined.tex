@@ -35,26 +35,31 @@ graded today, and the training configuration used in
   \item A cross-platform mobile application (Flutter) providing an
         intuitive Quran reading and recitation recording experience with
         the official KFGQPC Warsh font.
-  \item A real-time AI-driven recitation evaluation pipeline integrating
-        a fine-tuned Quranic ASR model with WebSocket streaming for
-        sub-second partial transcriptions.
+  \item A real-time AI-driven recitation evaluation pipeline combining
+        three complementary models --- our fine-tuned Whisper-Small for
+        wrong-word and tashkeel detection, an NVIDIA NeMo
+        FastConformer for transcription and CTC alignment, and the
+        Muaalem model for per-letter Tajweed grading --- with
+        WebSocket streaming for sub-second partial transcriptions.
   \item A dedicated React/TypeScript dashboard empowering teachers to
         review, correct, and certify (\textit{Ijaza}) student
         recitations, with a complementary administrator workspace for
         platform analytics and live AI/system telemetry.
   \item A production-grade containerised inference server combining
-        Caddy, Go, and Python NeMo, deployable on a single DigitalOcean
+        Caddy, Go, and a Python FastAPI service that co-hosts the three
+        model checkpoints (fine-tuned Whisper-Small, NeMo
+        FastConformer, and Muaalem) and merges their outputs into a
+        single feedback response, deployable on a single DigitalOcean
         droplet via a one-shot provisioning script.
   \item A Madd Tajweed analyser implementing eight Warsh/Azraq rules
         with auto-calibrated haraka length and CTC-derived per-letter
         timings.
-  \item A reproducible Warsh dataset preparation pipeline (publicly
-        released on the Hugging Face Hub) and two fine-tuned Whisper
-        checkpoints (\texttt{tahkik-basic-warsh},
+  \item A reproducible Warsh dataset preparation pipeline and two
+        fine-tuned Whisper checkpoints (\texttt{tahkik-basic-warsh},
         \texttt{tahkik-small-warsh}).
-  \item A documented Word Error Rate reduction from $48.4\%$ to $25.5\%$
-        through multi-reciter training and Warsh-aware text
-        normalisation.
+  \item A documented Word Error Rate reduction from $34.62\%$ to
+        $\mathbf{6.00\%}$ through multi-reciter training and Warsh-aware
+        text normalisation.
   \item A human-in-the-loop architecture combining AI efficiency with
         irreplaceable teacher expertise.
 \end{enumerate}

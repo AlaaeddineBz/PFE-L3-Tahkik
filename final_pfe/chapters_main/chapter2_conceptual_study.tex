@@ -32,7 +32,7 @@ Our development process is inspired by Agile Methodology, based on flexibility, 
     FR-01 & Authentication & Users must be able to register, log in (email/password or Google Sign-In), and log out securely. \\
     FR-02 & Quran Reading & Learners can browse and read the Quran with Warsh script rendering. \\
     FR-03 & Recitation Recording & Learners can record their voice reciting selected verses. \\
-    FR-04 & AI Feedback & The system processes audio using Whisper AI and returns a confidence score with error detection. \\
+    FR-04 & AI Feedback & The system processes audio through a three-model pipeline (fine-tuned Whisper-Small, NVIDIA NeMo FastConformer, and Muaalem) and returns a confidence score together with word, tashkeel, and per-letter Tajweed error detection. \\
     FR-05 & Teacher Review & Teachers can listen to submitted recitations, view AI feedback, and provide manual corrections. \\
     FR-06 & Progress Tracking & Learners can view their recitation history, scores, and improvement trends. \\
     FR-07 & Student Management & Teachers can manage their assigned students and track individual progress. \\
@@ -85,7 +85,7 @@ A use case diagram is a type of UML diagram that represents functional requireme
     Learner & A registered user who practices Quran recitation, receives AI and teacher feedback, and tracks progress. \\
     Teacher & A qualified instructor who reviews student recitations, provides manual feedback, manages students, and issues Ijaza certificates. \\
     Admin & A system supervisor with full control over the platform, managing users, teachers, analytics, daily verse, and AI health. \\
-    Tahkik AI Server & The backend AI system (NeMo FastConformer model) that processes audio and generates automated feedback. \\
+    Tahkik AI Server & The backend AI system hosting three complementary models --- our fine-tuned Whisper-Small (\texttt{tahkik-small-warsh}) for wrong-word and tashkeel detection, an NVIDIA NeMo FastConformer for transcription and forced alignment, and the Muaalem model for per-letter Tajweed grading --- that together process the audio and generate the AI feedback. \\
     Supabase & The backend-as-a-service handling authentication, database, and real-time subscriptions. \\
     \bottomrule
   \end{tabular}
@@ -139,7 +139,7 @@ The following use case diagram illustrates the core recitation and AI feedback f
     Browse Quran & Learner & Learner navigates the Quran reader with Warsh font rendering. \\
     Record Recitation & Learner & Learner records audio of their voice reciting selected verses. \\
     Submit Audio & Learner & Audio is streamed via WebSocket to the AI Server for processing. \\
-    Get AI Feedback & Tahkik AI & Whisper model transcribes audio, detects errors, returns confidence score. \\
+    Get AI Feedback & Tahkik AI & The three-model pipeline (fine-tuned Whisper-Small + NeMo FastConformer + Muaalem) transcribes the audio, detects word, tashkeel, and Tajweed errors, and returns a confidence score. \\
     View Score & Learner & Learner views the AI-generated feedback with highlighted errors. \\
     \bottomrule
   \end{tabular}
@@ -253,7 +253,7 @@ UML sequence diagrams model the interactions and behaviors of system components 
     Tahkik Dashboard (React) & The web dashboard used by teachers and admins. \\
     Supabase Auth & Authentication service handling JWT tokens and session management. \\
     Supabase DB & PostgreSQL database storing all application data. \\
-    Tahkik AI Server & Backend server (Python/Whisper) that processes audio and returns AI feedback. \\
+    Tahkik AI Server & Python FastAPI backend hosting three complementary models --- Tahkik's fine-tuned Whisper-Small for wrong-word / tashkeel detection, an NVIDIA NeMo FastConformer for transcription and forced alignment, and the Muaalem model for per-letter Tajweed grading --- whose merged output is returned to the client as the AI feedback. \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -424,7 +424,7 @@ A deployment diagram is a UML structural diagram that models the physical deploy
 \end{emeraldbox}
 
 \subsection{Deployment Diagram Presentation}
-The Tahkik platform is deployed across four environments: a mobile device (iOS/Android) running the Flutter app, a desktop browser hosting the React dashboard, a DigitalOcean droplet running a Docker Compose stack (Caddy reverse proxy, Go API gateway, and Python NeMo inference service), and the Supabase cloud providing authentication, database, storage, and real-time services. Model weights are fetched from the Hugging Face Hub.
+The Tahkik platform is deployed across four environments: a mobile device (iOS/Android) running the Flutter app, a desktop browser hosting the React dashboard, a DigitalOcean droplet running a Docker Compose stack (Caddy reverse proxy, Go API gateway, and Python inference service hosting the three-model pipeline --- Tahkik's fine-tuned Whisper-Small, the NVIDIA NeMo FastConformer, and the Muaalem Tajweed grader), and the Supabase cloud providing authentication, database, storage, and real-time services.
 
 \begin{figure}[H]
   \centering

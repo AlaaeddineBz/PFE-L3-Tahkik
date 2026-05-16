@@ -350,28 +350,37 @@ title Sequence Diagram — Recitation Submission and AI Feedback
 
 actor "Learner" as L
 participant "Tahkik App\\n(Flutter)" as App
-participant "Tahkik AI Server\\n(Python / NeMo)" as AI
+participant "Tahkik AI Server\\n(Python / FastAPI)" as AI
 database "Supabase DB" as DB
 
-L -> App : Select Surah and Ayahs
-App --> L : Open recording screen
+L -> App : Open Quran reader
+App --> L : Show Surah list
 
-L -> App : Record recitation audio
-App -> AI : Open WebSocket connection
+L -> App : Select Surah
+App --> L : Show Ayah list
+
+L -> App : Select specific Ayah to recite
+App --> L : Show recording screen\\nwith selected Ayah text
+
+L -> App : Press record button
+App -> AI : Open WebSocket connection\\n(send reference ayah text)
 
 loop Every ~1 second (streaming)
-  App -> AI : Stream audio chunk (PCM 16kHz)
-  AI -> AI : Transcribe with NeMo\\nFastConformer
-  AI --> App : Partial transcription
+  App -> AI : Stream audio chunk (PCM 16 kHz)
+  AI -> AI : Transcribe with NeMo FastConformer
+  AI --> App : Partial transcription text
   App --> L : Display partial text in real-time
 end
 
 App -> AI : Close stream (end of recording)
-AI -> AI : Detect Tajweed errors
-AI --> App : Final feedback\\n(confidence score, errors list)
-App -> DB : Save recitation session
+
+AI -> AI : Run three-model pipeline:\\n① Whisper-Small → transcription + tashkeel errors\\n② NeMo FastConformer → CTC alignment + per-letter timings\\n③ Muaalem → per-letter Tajweed grades
+
+AI --> App : Final feedback response:\\n• corrected transcription\\n• confidence score (0–100 %)\\n• wrong-word list (with positions)\\n• tashkeel errors (missing / wrong harakaat)\\n• per-letter Tajweed violations\\n  (madd, ghunnah, qalqala, tafkheem …)\\n  each with timestamp & severity
+
+App -> DB : Save recitation session\\n(audio URL + feedback JSON)
 DB --> App : session_id
-App --> L : Display AI feedback\\n(score + highlighted errors)
+App --> L : Display AI feedback:\\n score badge + word highlights\\n + per-letter Tajweed annotations
 """
 
 # ─── 9. SEQUENCE: TEACHER REVIEW ────────────────────────────────────────
@@ -707,7 +716,8 @@ node "DigitalOcean Droplet" as DO {
   node "Docker Compose" as DC {
     artifact "Caddy\\n(Reverse Proxy)" as CADDY
     artifact "Go API Server\\n(REST Gateway)" as GO
-    artifact "Python FastAPI\\n(NeMo Inference)" as PY
+    artifact "Python FastAPI\\n(Whisper Inference)" as PY
+    artifact "tahkik-small-warsh\\n(Whisper Checkpoint)" as MODEL
   }
 }
 
@@ -716,10 +726,6 @@ cloud "Supabase Cloud" as SB {
   artifact "Auth Service" as AUTH
   artifact "Storage" as STR
   artifact "Real-time" as RT
-}
-
-cloud "Hugging Face Hub" as HF {
-  artifact "Fine-tuned Whisper\\nCheckpoint" as MODEL
 }
 
 FAPP --> CADDY : HTTPS / WSS
@@ -734,7 +740,7 @@ FAPP --> STR : Audio files
 RAPP --> AUTH : JWT Auth
 RAPP --> PG : Data
 RAPP --> RT : Subscriptions
-PY --> MODEL : Model weights
+PY --> MODEL : loads weights
 """
 
 
